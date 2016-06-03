@@ -1,0 +1,295 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="common" basedir="..">
+	<dirname property="ant.file.common.dir" file="${ant.file.common}"/>
+	<dirname property="component" file="${ant.file.common.dir}"/>
+	<dirname property="VOB" file="${component}"/>
+	<dirname property="VOB.root" file="${VOB}"/>
+	<property name="common.xml.version" value="1.0.4"/>
+	<property name="scm.xml" location="${ant.file.common.dir}/scm.xml"/>
+	<import file="${scm.xml}"/>
+
+	<target name="pre-init" description="Placeholder">
+		<!--
+		This target should be overridden in the including build script
+		-->
+		<property name="app.short.name" value="${ant.project.name}"/>
+	</target>
+
+	<target name="init" depends="scm.init" description="Common initialization">
+		<echo message="${ant.project.name}: ${ant.file}"/>
+		<property name="tar.file" location="${stage.file.name}"/>
+		<!--
+		=============================================================
+		Javac options
+		=============================================================
+		-->
+		<property name="debug" value="true"/>
+		<property name="source" value="1.5"/>
+		<property name="target" value="1.5"/>
+		<property name="debuglevel" value="source,lines,vars"/>
+	</target>
+
+	<macrodef name="project-tgz">
+		<attribute name="basename" default="${scm.deploy.name}"/>
+		<attribute name="stage" default="${stage}" />
+		<attribute name="stage.tgz" default="@{stage}/tgz"/>
+		<attribute name="prefix" default="${scm.release.id}"/>
+		<attribute name="src" default="${component}" />
+		<attribute name="tgz" default="@{stage}/@{basename}.tgz" />
+
+                <element name="tgz-init" optional="yes"/>
+		<sequential>
+			<echo message="project-tgz:${ant.project.name}: ant.file: ${ant.file}"/>
+			<echo message="project-tgz:${ant.project.name}: ReleaseId: ${scm.release.id}"/>
+
+			<mkdir dir="@{stage.tgz}/META-INF"/>
+                        <tgz-init />
+			<manifest file="@{stage.tgz}/META-INF/MANIFEST.MF">
+				<attribute name="Implementation-Title" value="@{basename}"/>
+				<attribute name="Implementation-Version" value="${scm.release.id}"/>
+				<attribute name="Implementation-Vendor" value="Elsevier"/>
+				<attribute name="Build-Date" value="${scm.build.date_time}"/>
+				<attribute name="Build-Tag" value="${scm.build.tag}"/>
+				<attribute name="Built-By" value="${user.name}"/>
+			</manifest>
+			<tar destfile="@{tgz}" compression="gzip" longfile="gnu">
+				<tarfileset dir="@{stage.tgz}" prefix="@{prefix}"/>
+				<tarfileset dir="@{src}" prefix="@{prefix}">
+					<exclude name="build"/>
+					<exclude name="build/**"/>
+					<exclude name="src"/>
+					<exclude name="src/**"/>
+					<exclude name="test"/>
+					<exclude name="test/**"/>
+				</tarfileset>
+			</tar>
+		</sequential>
+	</macrodef>
+ 
+	<target depends="init" name="tgz" description="Create compressed tar file">
+		<project-tgz/>
+	</target>
+ 
+	<macrodef name="project-jar">
+		<attribute name="basename" />
+		<attribute name="stage" default="${stage}" />
+		<attribute name="jar.dir" default="${component}" />
+		<attribute name="src" default="@{jar.dir}/src" />
+		<attribute name="jar" default="${stage}/@{basename}.jar" />
+		<attribute name="classes" default="@{stage}/@{basename}/classes" />
+		<attribute name="jar.classpath" default="@{basename}.classpath" />
+		
+		<element name="jar-init" optional="yes"/>
+		<element name="jar-javac-add" optional="yes"/>
+		<sequential>
+			<echo message="project-jar:${ant.project.name}: ant.file: ${ant.file}"/>
+			<echo message="project-jar:${ant.project.name}: ReleaseId: ${scm.release.id}"/>
+			
+			<jar-init />
+
+			<mkdir dir="@{classes}" />
+			<copy todir="@{classes}" preservelastmodified="true" includeEmptyDirs="false">
+				<fileset dir="@{src}" excludes="**/*.launch, **/*.java, **/*.MF"/>
+			</copy>
+			<javac destdir="@{classes}" debug="${debug}" debuglevel="${debuglevel}" source="${source}" target="${target}" includeAntRuntime="false">
+				<jar-javac-add />
+				<src path="@{src}"/>
+				<classpath>
+					<path refid="@{jar.classpath}" />
+				</classpath>
+			</javac>
+			<mkdir dir="@{stage}" />
+			<jar destfile="@{jar}">
+				<fileset dir="@{classes}" excludes="**/Mock*, **/servlet/**"/>
+				<manifest>
+					<attribute name="Implementation-Title" value="@{basename}"/>
+					<attribute name="Implementation-Version" value="${scm.release.id}"/>
+					<attribute name="Implementation-Vendor" value="Elsevier"/>
+					<attribute name="Build-Date" value="${scm.build.date_time}"/>
+					<attribute name="Build-Tag" value="${scm.build.tag}"/>
+					<attribute name="Built-By" value="${user.name}"/>
+				</manifest>
+			</jar>
+		</sequential>
+	</macrodef>
+
+	<target depends="init" name="jar" description="Create generic jar">
+		<project-jar basename="${app.short.name}" />
+	</target>
+
+	<macrodef name="project-war">
+		<attribute name="basename" />
+		<attribute name="stage" default="${stage}" />
+		<attribute name="war.dir" default="${component}/@{basename}" />
+		<attribute name="war" default="${stage}/@{basename}.war" />
+		<attribute name="src" default="@{war.dir}/src" />
+		<attribute name="webinf" default="@{war.dir}/WebContent/WEB-INF" />
+		<attribute name="metainf" default="@{war.dir}/WebContent/META-INF" />
+		<attribute name="webinf.lib" default="@{webinf}/lib" />
+		<attribute name="lib" default="@{stage}/war.lib" />
+		<attribute name="webxml" default="@{webinf}/web.xml" />
+		<attribute name="classes" default="@{stage}/classes" />
+		<attribute name="war.classpath" default="@{basename}.classpath" />
+		
+		<element name="war-init" optional="yes" />
+		<element name="war-javac-add" optional="yes"/>
+		<sequential>
+			<echo message="project-war:${ant.project.name}: ant.file: ${ant.file}"/>
+			<echo message="project-war:${ant.project.name}: ReleaseId: ${scm.release.id}"/>
+			<echo message="project-war:${ant.project.name}: basename='@{basename}'"/>
+			<echo message="project-war:${ant.project.name}: war.dir='@{war.dir}'"/>
+			<echo message="project-war:${ant.project.name}: war.classpath='@{war.classpath}'"/>
+			<!--
+			Initialize the war's lib directory with webinf/lib
+			This will allow added other files to war's lib
+			without modifying the source tree.
+			-->
+			<mkdir dir="@{stage}" />
+			<delete dir="@{classes}" />
+			<mkdir dir="@{classes}" />
+			<delete dir="@{lib}" />
+			<mkdir dir="@{lib}" />
+			<copy todir="@{lib}" preservelastmodified="true" flatten="true">
+				<fileset dir="@{webinf}" includes="lib/**/*" />
+			</copy>
+			<!-- Add additional libraries into war lib -->
+			<war-init />
+			<copy todir="@{classes}" preservelastmodified="true" includeEmptyDirs="false">
+				<fileset dir="@{src}" excludes="**/*.launch, **/*.java"/>
+			</copy>
+			<javac destdir="@{classes}" debug="true" debuglevel="${debuglevel}" source="${source}" target="${target}" includeAntRuntime="false">
+				<war-javac-add />
+				<src path="@{src}"/>
+				<classpath>
+					<path refid="@{war.classpath}" />
+					<fileset dir="@{lib}" />
+				</classpath>
+			</javac>
+			<war destfile="@{war}" webxml="@{webxml}">
+				<lib dir="@{lib}" />
+				<classes dir="@{classes}" />
+				<webinf dir="@{webinf}" excludes="web.xml lib/ classes/" />
+				<metainf dir="@{metainf}" excludes="MANIFEST.MF"/>
+				<manifest>
+					<attribute name="Implementation-Title" value="@{basename}" />
+					<attribute name="Implementation-Version" value="${scm.release.id}" />
+					<attribute name="Implementation-Vendor" value="Elsevier" />
+					<attribute name="Build-Date" value="${scm.build.date_time}" />
+					<attribute name="Build-Tag" value="${scm.build.tag}"/>
+					<attribute name="Built-By" value="${user.name}" />
+				</manifest>
+				<fileset dir="@{war.dir}/WebContent" excludes="WEB-INF/ META-INF/" />
+			</war>
+		</sequential>
+	</macrodef>
+
+	<target depends="init" name="war" description="Create generic war">
+		<project-war basename="${app.short.name}" war.dir="${war.dir}" >
+			<war-init>
+				<copy todir="@{lib}" preservelastmodified="true">
+					<path refid="@{basename}.war.lib.classpath"/>
+				</copy>
+			</war-init>
+		</project-war>
+	</target>
+	
+	<macrodef name="project-ear">
+		<attribute name="basename" />
+		<attribute name="stage" default="${stage}"/>
+		<attribute name="ear.include" default="@{stage}/ear.include"/>
+		<attribute name="ear" default="@{stage}/@{basename}.ear"/>
+		<attribute name="war" default="@{stage}/@{basename}.war"/>
+		<attribute name="ear.dir" default="${component}/@{basename}EAR"/>
+		<attribute name="metainf" default="@{ear.dir}/META-INF"/>
+		<attribute name="appxml" default="@{metainf}/application.xml"/>
+		
+		<element name="ear-init" optional="yes" />
+		
+		<sequential>
+			<echo message="project-ear:${ant.project.name}: basename='@{basename}'"/>
+			<echo message="project-ear:${ant.project.name}: ear.dir='@{ear.dir}'"/>
+			<echo message="project-ear:${ant.project.name}: ear='@{ear}'"/>
+			<mkdir dir="@{stage}" />
+			<mkdir dir="@{ear.include}" />
+			<ear-init />
+			<ear destfile="@{ear}" appxml="@{appxml}">
+				<manifest>
+					<attribute name="Implementation-Title" value="@{basename}" />
+					<attribute name="Implementation-Version" value="${scm.release.id}" />
+					<attribute name="Implementation-Vendor" value="Elsevier" />
+					<attribute name="Build-Date" value="${scm.build.date_time}" />
+					<attribute name="Build-Tag" value="${scm.build.tag}"/>
+					<attribute name="Built-By" value="${user.name}" />
+				</manifest>
+				<metainf dir="@{metainf}">
+					<exclude name="MANIFEST.MF"/>
+					<exclude name="application.xml"/>
+				</metainf>
+				<fileset file="@{war}"/>
+				<fileset dir="@{ear.include}"/>
+			</ear>
+		</sequential>
+	</macrodef>
+
+	<target depends="war" name="ear" description="Create generic ear">
+		<project-ear basename="${app.short.name}" ear.dir="${ear.dir}">
+			<ear-init>
+				<mkdir dir="@{ear.include}/lib"/>
+				<copy todir="@{ear.include}/lib" preservelastmodified="true">
+					<path refid="@{basename}.ear.lib.classpath"/>
+				</copy>
+				<copy todir="@{ear.include}" preservelastmodified="true">
+					<path refid="@{basename}.ear.classpath"/>
+				</copy>
+			</ear-init>
+		</project-ear>
+	</target>
+	
+	<macrodef name="release-tar">
+		<attribute name="basename" default="${scm.payload.basename}" />
+		<attribute name="pkgtype" default="${scm.payload.pkgtype}" />
+		<attribute name="tar.file" default="${tar.file}" />
+		<attribute name="tar.include" default="${stage}/tar.include"/>
+		<attribute name="include.dir" default="${include.dir}" />
+		<attribute name="payload.file" default="${stage}/@{basename}.@{pkgtype}"/>
+		<attribute name="releaseId" default="${scm.release.id}"/>
+		<sequential>
+			<echo message="release-tar:${ant.project.name}: payload.file='@{payload.file}'"/>
+			<echo message="release-tar:${ant.project.name}: include.dir(filtered)='@{include.dir}'"/>
+			<echo message="release-tar:${ant.project.name}: tar.file='@{tar.file}'"/>
+			<mkdir dir="@{tar.include}"/>
+			<copy todir="@{tar.include}">
+				<filterset refid="ReleaseIdFilterSet"/>
+				<fileset dir="@{include.dir}"/>
+			</copy>
+			<tar destfile="@{tar.file}">
+				<tarfileset file="@{payload.file}" prefix="@{releaseId}"/>
+				<tarfileset dir="@{tar.include}" prefix="@{releaseId}">
+					<exclude name="*.sh"/>
+					<exclude name="*.bat"/>
+					<exclude name="*.pl"/>
+					<exclude name="*.py"/>
+				</tarfileset>
+				<tarfileset dir="@{tar.include}" mode="775" prefix="@{releaseId}">
+					<include name="*.sh"/>
+					<include name="*.bat"/>
+					<include name="*.pl"/>
+					<include name="*.py"/>
+				</tarfileset>
+			</tar>
+		</sequential>
+	</macrodef>
+
+	<target depends="ear" name="tar" description="Create Deployment Unit">
+		<release-tar />
+	</target>
+
+	<target depends="tar" name="du-build" description="Create tar Deployment Unit">
+		<copy todir="${release.dir}" file="${tar.file}" preservelastmodified="true"/>
+	</target>
+	
+	<target depends="init" name="clean">
+		<delete dir="${stage}" />
+	</target>
+	
+</project>

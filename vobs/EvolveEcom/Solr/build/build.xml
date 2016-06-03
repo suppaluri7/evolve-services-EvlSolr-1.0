@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="EvlSolr" default="tar">
+	<dirname property="ant.file.EvlSolr.dir" file="${ant.file.EvlSolr}"/>
+	<dirname property="component" file="${ant.file.EvlSolr.dir}"/>
+	<dirname property="VOB" file="${component}"/>
+	<dirname property="VOB.root" file="${VOB}"/>
+	<property name="common.xml" location="${ant.file.EvlSolr.dir}/common.xml"/>
+	<import file="${common.xml}"/>
+	
+	<target name="pre-init" description="EvlSolr pre-initialization.">
+		<property name="build.dir" location="${ant.file.EvlSolr.dir}"/>
+		<property name="project.properties.dir" location="${build.dir}"/>
+	</target>
+
+	<target depends="tgz" name="tar" description="Create Deployment Unit">
+		<release-tar />
+	</target>
+
+</project>
