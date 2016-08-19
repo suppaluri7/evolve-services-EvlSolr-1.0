@@ -157,7 +157,7 @@
 				</entity>
 				<entity name="authors" transformer="script:TransformAuthor"
 					query="select first_name,last_name, degree_letters from 
-							evladmin.author where resource_id=${resource.RESOURCE_ID} ">
+							evladmin.author where resource_id=${resource.RESOURCE_ID} order by display_order asc">
 				    <field name="author" column="author"/>	
                                     <field name="shortAuthor" column="shortAuthor"/>
 					<field name="authorSort" column="LAST_NAME"/>
