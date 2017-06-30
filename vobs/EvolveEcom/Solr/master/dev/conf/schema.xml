@@ -903,7 +903,7 @@
    <field name="id" type="string" indexed="true" stored="true" required="true" /> 
    <field name="sku" type="text_en_splitting_tight" indexed="true" stored="true" omitNorms="true"/>
    <!-- samals : Name data type is changed -->
-   <field name="name" type="string_ci" indexed="true" stored="true"/>
+   <field name="name" type="text_general" indexed="true" stored="true"/>
    <!-- samals : Name data type is changed -->
    <field name="alphaNameSort" type="alphaOnlySort" indexed="true" stored="false"/>
    <field name="manu" type="text_general" indexed="true" stored="true" omitNorms="true"/>
@@ -936,7 +936,7 @@
    <field name="facultyPrice"  type="float" indexed="true" stored="true"/>
    <field name="relevancy"  type="int" indexed="true" stored="true"/>
    <field name="copyYear" default="" type="string" indexed="true" stored="true"/>
-   <field name="pubDate" default="" type="string" indexed="true" stored="true"/>
+   <field name="pubDate" default="" type="date" indexed="true" stored="true"/>
    <field name="pubStatusId"  type="int" indexed="true" stored="true"/>
    <field name="productType" default="" type="string_ci" indexed="true" stored="true"/>
    <field name="productTypeName" default= "" type="string_ci" indexed="true" stored="true"/>
@@ -944,7 +944,8 @@
    <field name="format" default= "" type="text_general" indexed="true" stored="true"/>
    <field name="authorSort" default= "" type="string_ci" indexed="true" stored="true"/>
    <field name="edition"  type="float" indexed="true" stored="true"/>
-   <field name="author" type="string_ci" indexed="true" stored="true" multiValued="true"/>
+   <!--<field name="author" type="string_ci" indexed="true" stored="true" multiValued="true"/>-->
+   <field name="author" type="text_general" indexed="true" stored="true" multiValued="true"/>
    <field name="shortAuthor" type="string_ci" indexed="true" stored="true" multiValued="true"/>
    <field name="role"  type="string" indexed="true" stored="true" multiValued="true"/>
    <field name="student-sites" default= "" type="string" indexed="true" stored="true"/>
@@ -986,7 +987,7 @@
    <!-- catchall field, containing all other searchable text fields (implemented
         via copyField further on in this schema  -->
    <field name="text" type="text_general" indexed="true" stored="false" multiValued="true"/>
-
+   
    <!-- catchall text field that indexes tokens both normally and in reverse for efficient
         leading wildcard queries. -->
    <field name="text_rev" type="text_general_rev" indexed="true" stored="false" multiValued="true"/>
