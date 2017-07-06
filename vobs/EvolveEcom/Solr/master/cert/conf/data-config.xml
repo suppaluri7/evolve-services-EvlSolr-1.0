@@ -147,13 +147,14 @@
 							<field column="LARGE_STRING_VALUE" clob="true" name="coreProductFlag" />
 				</entity>
 				<entity name="product_type" transformer="script:GenerateFacultyPrice" 
-					query="select product_type_key,name,${base_product_resource.listPrice} as ORIGINAL_PRICE,product_type_id,eflag,relevancy from
+					query="select product_type_key,name,category,${base_product_resource.listPrice} as ORIGINAL_PRICE,product_type_id,eflag,relevancy from
 					evladmin.product_type where product_type_id='${base_product_resource.PRODUCT_TYPE_ID}'">
 					<field column="PRODUCT_TYPE_KEY" name="productType"/>
 				    <field column="NAME" name="productTypeName"/>
                                     <field column="EFLAG" name="eFlag"/>
                                     <field column="RELEVANCY" name="relevancy"/>
                                     <field column="facultyPrice" name="facultyPrice"/>
+                                    <field column="CATEGORY" name="category"/>
 				</entity>
 				<entity name="authors" transformer="script:TransformAuthor"
 					query="select first_name,last_name, degree_letters from 
