@@ -936,7 +936,7 @@
    <field name="facultyPrice"  type="float" indexed="true" stored="true"/>
    <field name="relevancy"  type="int" indexed="true" stored="true"/>
    <field name="copyYear" default="" type="string" indexed="true" stored="true"/>
-   <field name="pubDate" default="" type="string" indexed="true" stored="true"/>
+   <field name="pubDate" default="" type="date" indexed="true" stored="true"/>
    <field name="pubStatusId"  type="int" indexed="true" stored="true"/>
    <field name="productType" default="" type="string_ci" indexed="true" stored="true"/>
    <field name="productTypeName" default= "" type="string_ci" indexed="true" stored="true"/>
