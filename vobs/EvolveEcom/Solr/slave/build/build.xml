@@ -19,10 +19,12 @@
 	<target depends="init" name="tgz" description="Create compressed tar file">
 		<project-tgz src="${component}/dev" tgz="${component}/dev/${scm.deploy.name}.tgz"/>
 		<project-tgz src="${component}/cert" tgz="${component}/cert/${scm.deploy.name}.tgz"/>
+		<project-tgz src="${component}/stage" tgz="${component}/stage/${scm.deploy.name}.tgz"/>
 		<project-tgz src="${component}/prod" tgz="${component}/prod/${scm.deploy.name}.tgz"/>
 		<project-tgz/>
 		<delete file="${component}/dev/${scm.deploy.name}.tgz"/>
 		<delete file="${component}/cert/${scm.deploy.name}.tgz"/>
+		<delete file="${component}/stage/${scm.deploy.name}.tgz"/>
 		<delete file="${component}/prod/${scm.deploy.name}.tgz"/>
 	</target>
 
