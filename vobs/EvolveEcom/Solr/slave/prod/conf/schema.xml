@@ -905,6 +905,7 @@
    <!-- samals : Name data type is changed -->
    <field name="name" type="text_general" indexed="true" stored="true"/>
    <!-- samals : Name data type is changed -->
+   <field name="title_sortable" type="lowercase" indexed="true" stored="true"/>
    <field name="alphaNameSort" type="alphaOnlySort" indexed="true" stored="false"/>
    <field name="manu" type="text_general" indexed="true" stored="true" omitNorms="true"/>
    <field name="cat" type="string" indexed="true" stored="true" multiValued="true"/>
@@ -1070,6 +1071,7 @@
         is added to the index.  It's used either to index the same field differently,
         or to add multiple fields to the same field for easier/faster searching.  -->
 
+   <copyField source="name" dest="title_sortable" maxChars="N"/>
    <copyField source="cat" dest="text"/>
    <copyField source="name" dest="text"/>
    <copyField source="manu" dest="text"/>
