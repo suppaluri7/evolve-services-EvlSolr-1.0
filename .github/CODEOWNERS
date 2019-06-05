@@ -3,6 +3,6 @@
 
 # These owners will be the default owners for everything in
 # the repo. Unless a later match takes precedence,
-# Education-Evolve will be requested for
+# Education-Evolve-SRVC-BACKOFFICE will be requested for
 # review when someone opens a pull request.
-*       @elsevierPTG/Education-Evolve
+*       @elsevierPTG/Education-Evolve-SRVC-BACKOFFICE
