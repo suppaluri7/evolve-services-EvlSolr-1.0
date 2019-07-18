@@ -47,21 +47,32 @@
 					}
 					return row;
 				}
+					
 				function TransformPriceAndEdition(row){
 					var evolvePrice = row.get('PRICE');
 					var ppmPrice = row.get('PPM_PRICE');
+					var ppmPriceCAD = row.get('PPM_PRICE_CAD');
 					var edition = row.get('EDITION_NUMBER');
+					
+					if(ppmPriceCAD == null){
+						ppmPriceCAD = "0.0";
+					}
+					
 					if(evolvePrice == null){
 						evolvePrice = ppmPrice;
 					}
-                                        if(evolvePrice == null){
+					
+                    if(evolvePrice == null){
 						evolvePrice = "0.0";
 					}
-                                        if(edition == null){
+					
+                    if(edition == null){
 						edition = "1.0";
 					}
+					
 					row.put('listPrice',parseFloat(evolvePrice));
-                                        row.put('edition', parseFloat(edition));
+					row.put('listPriceCAD',parseFloat(ppmPriceCAD));
+                    row.put('edition', parseFloat(edition));
 					return row;
 				}
                                 function GenerateFacultyPrice(row){
@@ -104,11 +115,12 @@
                 <field column="RESOURCE_TYPE_KEY"  name="type" />
             </entity>
 			<entity name="base_product_resource" transformer="script:TransformPriceAndEdition" 
-				query="select ppm_price,price,product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,pub_status_id,copyright_year,edition_number,
+				query="select ppm_price,ppm_price_cad,price,product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,pub_status_id,copyright_year,edition_number,
                                                 sbu_code,profit_center_code,major_subject_code,archived 
 						from evladmin.base_product_resource 
 						where resource_id='${resource.RESOURCE_ID}'">
 				<field column="PPM_PRICE"  name="ppmPrice"/>
+				<field column="PPM_PRICE_CAD"  name="ppmPriceCAD"/>
 				<field column="PRICE"  name="evolvePrice"/>
 				<field column="PUB_DATE" name="pubDate"/>
 				<field column="PUB_STATUS_ID" name="pubStatusId"/>
