@@ -932,6 +932,7 @@
    <field name="contactOriginRelevancy" type="float" indexed="true" stored="true"/> 
    <field name="type" type="string" indexed="true" stored="true" default=""/>
    <field name="ppmPrice" default= "0.0" type="string" indexed="true" stored="true"/>
+   <field name="ppmPriceCAD" default= "0.0" type="string" indexed="true" stored="true"/>
    <field name="evolvePrice" default= "0.0" type="string" indexed="true" stored="true"/>
    <field name="listPrice"  type="float" indexed="true" stored="true"/>
    <field name="facultyPrice"  type="float" indexed="true" stored="true"/>
