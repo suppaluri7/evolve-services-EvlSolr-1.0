@@ -47,24 +47,37 @@
 					}
 					return row;
 				}
+				
 				function TransformPriceAndEdition(row){
 					var evolvePrice = row.get('PRICE');
 					var ppmPrice = row.get('PPM_PRICE');
+					var ppmPriceCAD = row.get('PPM_PRICE_CAD');
 					var edition = row.get('EDITION_NUMBER');
+					
+					if(ppmPriceCAD == null){
+						ppmPriceCAD = "0.0";
+					}
+					
 					if(evolvePrice == null){
 						evolvePrice = ppmPrice;
 					}
-                                        if(evolvePrice == null){
+					
+                    if(evolvePrice == null){
 						evolvePrice = "0.0";
 					}
-                                        if(edition == null){
+					
+                    if(edition == null){
 						edition = "1.0";
 					}
+					
 					row.put('listPrice',parseFloat(evolvePrice));
-                                        row.put('edition', parseFloat(edition));
+					row.put('listPriceCAD',parseFloat(ppmPriceCAD));
+                    row.put('edition', parseFloat(edition));
 					return row;
 				}
-                                function GenerateFacultyPrice(row){
+				
+				
+                function GenerateFacultyPrice(row){
 					var facultyPrice = row.get('ORIGINAL_PRICE');
 					var productType = row.get('PRODUCT_TYPE_KEY');
 					var eFlag = row.get('EFLAG');
