@@ -78,14 +78,17 @@
 				
                                 function GenerateFacultyPrice(row){
 					var facultyPrice = row.get('ORIGINAL_PRICE');
+					var facultyPriceCAD = row.get('ORIGINAL_PRICE_CAD');
 					var productType = row.get('PRODUCT_TYPE_KEY');
 					var eFlag = row.get('EFLAG');
 					if(eFlag == "Y") {
 						if (productType.toLowerCase().indexOf("ebook") == -1) {
 							facultyPrice = "0.0";
+							facultyPriceCAD = "0.0";
 						}
 					}
 					row.put('facultyPrice', parseFloat(facultyPrice));
+					row.put('facultyPriceCAD', parseFloat(facultyPriceCAD));
 					return row;
 				}
                                 function TransformDiscSpec(row){
@@ -160,7 +163,7 @@
 							<field column="LARGE_STRING_VALUE" clob="true" name="coreProductFlag" />
 				</entity>
 				<entity name="product_type" transformer="script:GenerateFacultyPrice" 
-					query="select product_type_key,name,category,${base_product_resource.listPrice} as ORIGINAL_PRICE,product_type_id,eflag,relevancy from
+					query="select product_type_key,name,category,${base_product_resource.listPrice} as ORIGINAL_PRICE,${base_product_resource.listPriceCAD} as ORIGINAL_PRICE_CAD,product_type_id,eflag,relevancy from
 					evladmin.product_type where product_type_id='${base_product_resource.PRODUCT_TYPE_ID}'">
 					<field column="PRODUCT_TYPE_KEY" name="productType"/>
 				    <field column="NAME" name="productTypeName"/>
