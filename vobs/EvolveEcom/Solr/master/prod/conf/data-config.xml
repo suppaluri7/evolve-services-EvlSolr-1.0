@@ -171,6 +171,7 @@
                                     <field column="EFLAG" name="eFlag"/>
                                     <field column="RELEVANCY" name="relevancy"/>
                                     <field column="facultyPrice" name="facultyPrice"/>
+                                    <field column="facultyPriceCAD" name="facultyPriceCAD"/>
                                     <field column="CATEGORY" name="category"/>
 				</entity>
 				<entity name="authors" transformer="script:TransformAuthor"
