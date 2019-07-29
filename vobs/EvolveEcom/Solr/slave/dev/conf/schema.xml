@@ -936,6 +936,7 @@
    <field name="evolvePrice" default= "0.0" type="string" indexed="true" stored="true"/>
    <field name="listPrice"  type="float" indexed="true" stored="true"/>
    <field name="facultyPrice"  type="float" indexed="true" stored="true"/>
+   <field name="facultyPriceCAD"  type="float" indexed="true" stored="true"/>
    <field name="relevancy"  type="int" indexed="true" stored="true"/>
    <field name="copyYear" default="" type="string" indexed="true" stored="true"/>
    <field name="pubDate" default="" type="date" indexed="true" stored="true"/>
