@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <dataConfig>
-    <dataSource name="jdbc" jndiName="jdbc/evolve" type="JdbcDataSource" />
+	<dataSource type="JdbcDataSource" driver="oracle.jdbc.pool.OracleDataSource" url="${evolve.db.url}" user="${evolve.db.username}" password="${evolve.db.password}"/>
 	<script><![CDATA[
                 function TransformAuthor(row)    {
                     var firstName = row.get('FIRST_NAME');
@@ -29,7 +29,8 @@
 				function TransformFormats(row)    {
 					var JSON={};
                     var platformString = row.get('LARGE_STRING_VALUE');
-					var platformkeys = java.util.ArrayList();
+					var ArrayList = Java.type('java.util.ArrayList');
+					var platformkeys = new ArrayList();
 					if(platformString!= null){
 					    var parsablePlatfromString = "(" + platformString.toString() + ")";
 						var platforms= eval(parsablePlatfromString);
@@ -47,7 +48,7 @@
 					}
 					return row;
 				}
-				
+					
 				function TransformPriceAndEdition(row){
 					var evolvePrice = row.get('PRICE');
 					var ppmPrice = row.get('PPM_PRICE');
@@ -105,20 +106,20 @@
 				}
     ]]></script>
 	<document>
-		<entity name="resource" 
-			query="select * from evladmin.evolve_resource where resource_type_id=5"
-                        deltaImportQuery="select * from evladmin.evolve_resource where resource_type_id=5 and RESOURCE_ID='${dataimporter.delta.RESOURCE_ID}'"
-                        deltaQuery="select RESOURCE_ID from evladmin.base_product_resource where update_date &gt; to_date('${dataimporter.last_index_time}','yyyy-mm-dd hh24:mi:ss')">
+		<entity name="resource"
+				query="select * from evladmin.evolve_resource where resource_type_id=5"
+				deltaImportQuery="select * from evladmin.evolve_resource where resource_type_id=5 and RESOURCE_ID='${dataimporter.delta.RESOURCE_ID}'"
+				deltaQuery="select RESOURCE_ID from evladmin.base_product_resource where update_date &gt; to_date('${dataimporter.last_index_time}','yyyy-mm-dd hh24:mi:ss')">
 			<field column="RESOURCE_ID" name="id" />
 			<field column="NAME" name="name" />
 			<field column="RESOURCE_KEY" name="resourceId" />
-			<entity name="resource_type" 
-				query="select resource_type_key from evladmin.resource_type 
+			<entity name="resource_type"
+					query="select resource_type_key from evladmin.resource_type
 						where resource_type_id='${resource.RESOURCE_TYPE_ID}'">
-                <field column="RESOURCE_TYPE_KEY"  name="type" />
-            </entity>
-			<entity name="base_product_resource" transformer="script:TransformPriceAndEdition" 
-				query="select ppm_price,ppm_price_cad,price,product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,pub_status_id,copyright_year,edition_number,
+				<field column="RESOURCE_TYPE_KEY"  name="type" />
+			</entity>
+			<entity name="base_product_resource" transformer="script:TransformPriceAndEdition"
+					query="select ppm_price,ppm_price_cad,price,product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,pub_status_id,copyright_year,edition_number,
                                                 sbu_code,profit_center_code,major_subject_code,archived 
 						from evladmin.base_product_resource 
 						where resource_id='${resource.RESOURCE_ID}'">
@@ -131,16 +132,16 @@
 				<field column="listPrice" name="listPrice"/>
 				<field column="edition" name="edition"/>
 				<field column="archived" name="archived"/>
-				<entity name = "disciplineSpeciality"  transformer="script:TransformDiscSpec" 
+				<entity name = "disciplineSpeciality"  transformer="script:TransformDiscSpec"
 						query= "select t.discipline_id as DISCIPLINE_ID,t.specialty_id as SPECIALTY_ID  from 
 								evladmin.disc_spec_peak_taxonomy t,evladmin.smart_taxonomy_sbu_pc_msc st 
 								where t.taxonomy_id = st.taxonomy_id 
 								and st.sbu_code = '${base_product_resource.SBU_CODE}' 
 								and st.profit_center_code = '${base_product_resource.PROFIT_CENTER_CODE}' 
 								and st.major_subject_code = '${base_product_resource.MAJOR_SUBJECT_CODE}'">
-						<field column="category_id" name="category_id"/>
+					<field column="category_id" name="category_id"/>
 				</entity>
-                <entity name="isbnJsonData"  transformer="ClobTransformer"
+				<entity name="isbnJsonData"  transformer="ClobTransformer"
 						query="select jd.large_string_value from evladmin.json_data jd where 
 							jd.resource_id = '${resource.RESOURCE_ID}' and jd.name='isbn10'">
 					<field column="LARGE_STRING_VALUE" clob="true" name="isbn10" />
@@ -148,60 +149,60 @@
 				<entity name="contactOriginJsonData"  transformer="ClobTransformer,script:TransformOrigin"
 						query="select jd.large_string_value from evladmin.json_data jd where 
 							jd.resource_id = '${resource.RESOURCE_ID}' and jd.name='contactOrigin'">
-						        <field column="LARGE_STRING_VALUE" clob="true" name="contactOrigin" />
-						        <field column="contactOriginRelevancy" name="contactOriginRelevancy" />
+					<field column="LARGE_STRING_VALUE" clob="true" name="contactOrigin" />
+					<field column="contactOriginRelevancy" name="contactOriginRelevancy" />
 				</entity>
-                                <entity name="ancillaryJSONdata"  transformer="ClobTransformer"
+				<entity name="ancillaryJSONdata"  transformer="ClobTransformer"
 						query="select jd.large_string_value from evladmin.json_data jd where 
 							jd.resource_id = '${resource.RESOURCE_ID}' and jd.name ='ancillary'">
-							<field column="LARGE_STRING_VALUE" clob="true" name="ancillary" />
+					<field column="LARGE_STRING_VALUE" clob="true" name="ancillary" />
 				</entity>
-                <entity name="coreProductJsonData"  transformer="ClobTransformer"
+				<entity name="coreProductJsonData"  transformer="ClobTransformer"
 						query="select jd.large_string_value from evladmin.json_data jd where 
 							jd.resource_id = '${resource.RESOURCE_ID}' and jd.name ='coreProductFlag'">
-							<field column="LARGE_STRING_VALUE" clob="true" name="coreProductFlag" />
+					<field column="LARGE_STRING_VALUE" clob="true" name="coreProductFlag" />
 				</entity>
-				<entity name="product_type" transformer="script:GenerateFacultyPrice" 
-					query="select product_type_key,name,category,${base_product_resource.listPrice} as ORIGINAL_PRICE,${base_product_resource.listPriceCAD} as ORIGINAL_PRICE_CAD,product_type_id,eflag,relevancy from
+				<entity name="product_type" transformer="script:GenerateFacultyPrice"
+						query="select product_type_key,name,category,${base_product_resource.listPrice} as ORIGINAL_PRICE,${base_product_resource.listPriceCAD} as ORIGINAL_PRICE_CAD,product_type_id,eflag,relevancy from
 					evladmin.product_type where product_type_id='${base_product_resource.PRODUCT_TYPE_ID}'">
 					<field column="PRODUCT_TYPE_KEY" name="productType"/>
-				    <field column="NAME" name="productTypeName"/>
-                                    <field column="EFLAG" name="eFlag"/>
-                                    <field column="RELEVANCY" name="relevancy"/>
-                                    <field column="facultyPrice" name="facultyPrice"/>
-                                    <field column="facultyPriceCAD" name="facultyPriceCAD"/>
-                                    <field column="CATEGORY" name="category"/>
+					<field column="NAME" name="productTypeName"/>
+					<field column="EFLAG" name="eFlag"/>
+					<field column="RELEVANCY" name="relevancy"/>
+					<field column="facultyPrice" name="facultyPrice"/>
+					<field column="facultyPriceCAD" name="facultyPriceCAD"/>
+					<field column="CATEGORY" name="category"/>
 				</entity>
 				<entity name="authors" transformer="script:TransformAuthor"
-					query="select first_name,last_name, degree_letters from 
+						query="select first_name,last_name, degree_letters from
 							evladmin.author where resource_id=${resource.RESOURCE_ID} order by display_order asc">
-				    <field name="author" column="author"/>	
-                                    <field name="shortAuthor" column="shortAuthor"/>
+					<field name="author" column="author"/>
+					<field name="shortAuthor" column="shortAuthor"/>
 					<field name="authorSort" column="LAST_NAME"/>
 				</entity>
-				<entity name="facultyProduct" 
+				<entity name="facultyProduct"
 						query="select e.RESOURCE_ID as FACULTY_ID,p.include_in_search_flag as SEARCH_FLAG,p.marketing_url,lower(r.name) as ROLE_NAME,
 						    e.published_flag as PUB_FLAG from 
 							evladmin.evolve_resource e,evladmin.product_resource p,evladmin.role r  
 							where e.resource_id=p.resource_id and r.role_id=e.role_id and r.role_id=6 and 
 							p.base_product_resource_id= '${resource.RESOURCE_ID}'
 							and e.published_flag='Y'">
-					<field name="role" column="ROLE_NAME"/>	
+					<field name="role" column="ROLE_NAME"/>
 					<field name="faculty-publish-flag" column="PUB_FLAG"/>
-                                        <field name="faculty-search-flag" column="SEARCH_FLAG"/>
+					<field name="faculty-search-flag" column="SEARCH_FLAG"/>
 					<entity name="jsonData"  transformer="ClobTransformer,script:TransformFormats"
-						query="select large_string_value from evladmin.json_data where
+							query="select large_string_value from evladmin.json_data where
 							resource_id='${facultyProduct.FACULTY_ID}' and name='platforms'">
-							<field column="LARGE_STRING_VALUE" clob="true" name="format" />
-							<field column="availableFormat" name="availableFormat" />
+						<field column="LARGE_STRING_VALUE" clob="true" name="format" />
+						<field column="availableFormat" name="availableFormat" />
 					</entity>
 					<entity name="jsonData"  transformer="ClobTransformer"
-						query="select jd.large_string_value from evladmin.json_data jd where
+							query="select jd.large_string_value from evladmin.json_data jd where
 							jd.resource_id='${facultyProduct.FACULTY_ID}' and jd.name='sites'">
-							<field column="LARGE_STRING_VALUE" clob="true" name="faculty-sites" />
+						<field column="LARGE_STRING_VALUE" clob="true" name="faculty-sites" />
 					</entity>
 				</entity>
-				<entity name="studentProduct" 
+				<entity name="studentProduct"
 						query="select e.RESOURCE_ID as STUDENT_ID,p.include_in_search_flag as SEARCH_FLAG,p.marketing_url,lower(r.name) as ROLE_NAME ,
 						    e.published_flag as PUB_FLAG from 
 							evladmin.evolve_resource e,evladmin.product_resource p,evladmin.role r  
@@ -210,28 +211,28 @@
 							and e.published_flag='Y'">
 					<field name="role" column="ROLE_NAME"/>
 					<field name="student-publish-flag" column="PUB_FLAG"/>
-                                        <field name="student-search-flag" column="SEARCH_FLAG"/>
+					<field name="student-search-flag" column="SEARCH_FLAG"/>
 					<entity name="jsonData"  transformer="ClobTransformer"
-						query="select jd.large_string_value from evladmin.json_data jd where
+							query="select jd.large_string_value from evladmin.json_data jd where
 							jd.resource_id='${studentProduct.STUDENT_ID}' and jd.name='sites'">
-							<field column="LARGE_STRING_VALUE" clob="true" name="student-sites" />
+						<field column="LARGE_STRING_VALUE" clob="true" name="student-sites" />
 					</entity>
 				</entity>
-                <entity name="studentAdminData"
+				<entity name="studentAdminData"
 						query="select to_char(update_date,'MM/DD/YY') as UPDATE_DATE,update_by,published_flag from evladmin.evolve_resource 
 							   where resource_key='${resource.RESOURCE_KEY}' and role_id=6">
-						<field name="statusFaculty" column="PUBLISHED_FLAG"/>
-						<field name="modifiedDateFaculty" column="UPDATE_DATE"/>
-						<field name="modifiedByFaculty" column="UPDATE_BY"/>
+					<field name="statusFaculty" column="PUBLISHED_FLAG"/>
+					<field name="modifiedDateFaculty" column="UPDATE_DATE"/>
+					<field name="modifiedByFaculty" column="UPDATE_BY"/>
 				</entity>
 				<entity name="facultyAdminData"
 						query="select to_char(update_date,'MM/DD/YY') as UPDATE_DATE,update_by,published_flag from evladmin.evolve_resource 
 							   where resource_key='${resource.RESOURCE_KEY}' and role_id=5">
-						<field name="statusStudent" column="PUBLISHED_FLAG"/>
-						<field name="modifiedDateStudent" column="UPDATE_DATE"/>
-						<field name="modifiedByStudent" column="UPDATE_BY"/>
+					<field name="statusStudent" column="PUBLISHED_FLAG"/>
+					<field name="modifiedDateStudent" column="UPDATE_DATE"/>
+					<field name="modifiedByStudent" column="UPDATE_BY"/>
 				</entity>
 			</entity>
 		</entity>
-	</document>	
+	</document>
 </dataConfig>
