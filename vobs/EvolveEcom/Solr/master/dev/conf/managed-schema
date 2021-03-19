@@ -123,12 +123,12 @@
     <field name="_text_" type="text_general" indexed="true" stored="false" multiValued="true"/>
 	
 	<!-- samals : Added the following schema definition for evolve -->
-	<!-- samals : Name data type is changed -->
-    <field name="name" type="text_general" indexed="true" stored="true"/>
-    <!-- samals : Name data type is changed -->
+    <field name="name" type="text_general_ci" indexed="true" stored="true"/>
+    <field name="title_sortable" type="lowercase" indexed="true" stored="true"/>
+    <field name="category" type="text_general_ci" indexed="true" stored="true"/>
 
-    <field name="resourceId" type="text_general" indexed="true" stored="true"/>
-    <field name="isbn10" type="text_general" indexed="true" stored="true"/>
+    <field name="resourceId" type="text_general_ci" indexed="true" stored="true"/>
+    <field name="isbn10" type="text_general_ci" indexed="true" stored="true"/>
     <field name="contactOrigin" default= "" type="string" indexed="true" stored="true"/>
     <field name="ancillary" default='"N"' type="string" indexed="true" stored="true"/>
     <field name="coreProductFlag" default='"N"' type="string" indexed="true" stored="true"/>
@@ -148,11 +148,11 @@
     <field name="productType" default="" type="string_ci" indexed="true" stored="true"/>
     <field name="productTypeName" default= "" type="string_ci" indexed="true" stored="true"/>
     <field name="marketingUrl" default= "" type="string" indexed="true" stored="true"/>
-    <field name="format" default= "" type="text_general" indexed="true" stored="true"/>
+    <field name="format" default= "" type="text_general_ci" indexed="true" stored="true"/>
     <field name="authorSort" default= "" type="string_ci" indexed="true" stored="true"/>
     <field name="edition"  type="pfloat" indexed="true" stored="true"/>
     <!--<field name="author" type="string_ci" indexed="true" stored="true" multiValued="true"/>-->
-    <field name="author" type="text_general" indexed="true" stored="true" multiValued="true"/>
+    <field name="author" type="text_general_ci" indexed="true" stored="true" multiValued="true"/>
     <field name="shortAuthor" type="string_ci" indexed="true" stored="true" multiValued="true"/>
     <field name="role"  type="string" indexed="true" stored="true" multiValued="true"/>
     <field name="student-sites" default= "" type="string" indexed="true" stored="true"/>
@@ -226,6 +226,9 @@
 
     <copyField source="sourceFieldName" dest="destinationFieldName"/>
     -->
+    <!-- samals: added evolve copyfields -->
+    <copyField source="name" dest="title_sortable" maxChars="N"/>
+    <!-- samals: added evolve copyfields -->
 
     <!-- field type definitions. The "name" attribute is
        just a label to be used by field definitions.  The "class"
@@ -370,7 +373,23 @@
       </analyzer>
     </fieldType>
 
-    
+    <!-- samals : added text_general for evolve product -->
+    <fieldType name="text_general_ci" class="solr.TextField" positionIncrementGap="100">
+      <analyzer type="index">
+        <tokenizer class="solr.StandardTokenizerFactory"/>
+        <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt"/>
+        <filter class="solr.LowerCaseFilterFactory"/>
+      </analyzer>
+      <analyzer type="query">
+        <tokenizer class="solr.StandardTokenizerFactory"/>
+        <filter class="solr.StopFilterFactory" ignoreCase="true" words="stopwords.txt"/>
+        <filter class="solr.SynonymGraphFilterFactory" synonyms="synonyms.txt" ignoreCase="true" expand="true"/>
+        <filter class="solr.LowerCaseFilterFactory"/>
+      </analyzer>
+    </fieldType>
+    <!-- samals : added text_general for evolve product -->
+
+
     <!-- SortableTextField generaly functions exactly like TextField,
          except that it supports, and by default uses, docValues for sorting (or faceting)
          on the first 1024 characters of the original field values (which is configurable).
