@@ -107,7 +107,7 @@
     ]]></script>
 	<document>
 		<entity name="resource" 
-			query="select * from evladmin.evolve_resource where resource_type_id=5"
+			query="select * from evladmin.evolve_resource where resource_id=94690"
                         deltaImportQuery="select * from evladmin.evolve_resource where resource_type_id=5 and RESOURCE_ID='${dataimporter.delta.RESOURCE_ID}'"
                         deltaQuery="select RESOURCE_ID from evladmin.base_product_resource where update_date &gt; to_date('${dataimporter.last_index_time}','yyyy-mm-dd hh24:mi:ss')">
 			<field column="RESOURCE_ID" name="id" />
