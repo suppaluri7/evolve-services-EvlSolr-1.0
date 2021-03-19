@@ -118,7 +118,7 @@
                 <field column="RESOURCE_TYPE_KEY"  name="type" />
             </entity>
 			<entity name="base_product_resource" transformer="script:TransformPriceAndEdition" 
-				query="select ppm_price,ppm_price_cad,(case when ppm_price is not null then ppm_price else price end) price,product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,pub_status_id,copyright_year,edition_number,
+				query="select ppm_price,ppm_price_cad,(case when ppm_price is not null then ppm_price else price end) as price,product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,pub_status_id,copyright_year,edition_number,
                                                 sbu_code,profit_center_code,major_subject_code,archived 
 						from evladmin.base_product_resource 
 						where resource_id='${resource.RESOURCE_ID}'">
