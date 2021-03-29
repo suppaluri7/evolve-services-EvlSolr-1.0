@@ -24,3 +24,7 @@ cp solr.xml solr-8.8.1/server/solr
 
 echo "Copy ojdbc6.jar to solr-8.8.1/server/solr/evolve/lib folder"
 cp ojdbc6.jar solr-8.8.1/server/solr/evolve/lib
+
+echo "Todo: Copy overwrite all file in conf folder to solr-8.8.1/server/solr/evolve/conf folder"
+
+echo "Todo: Start Solr, solr start -Devolve.db.url=jdbc:oracle:thin:@localhost:1522/EVDEVCS -Devolve.db.username=<dbuser>  -Devolve.db.password=<db pass>"
