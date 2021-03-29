@@ -887,7 +887,7 @@
         <str name="backupAfter">optimize</str>
 
         <!--If configuration files need to be replicated give the names here, separated by comma -->
-        <str name="confFiles">schema.xml</str>
+        <str name="confFiles">managed-schema,evolve-mapping-char.txt</str>
         <!--The default value of reservation is 10 secs.See the documentation below . Normally , you should not need to specify this -->
         <!-- <str name="commitReserveDuration">00:00:10</str> -->
     </lst>
