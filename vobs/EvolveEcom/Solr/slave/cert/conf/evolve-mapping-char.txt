@@ -10,3 +10,11 @@
 #     "target".length() >= 0 (target can be empty.)
 # Ⓡ  [CIRCLED LATIN CAPITAL LETTER R]
 "\u00AE" => ""
+# ™  [TRADE MARK]
+"\u2122" => ""
+# ©  [COPYRIGHT]
+"\u00A9" => ""
+# ℠ [SERVICE MARK]
+"\u2120" => ""
+# ℗  [SOUND RECORDING COPYRIGHT]
+"\u2117" => ""
