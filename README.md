@@ -11,7 +11,7 @@
 
 - Download [Jetty 7.6.6](https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-distribution/7.6.6.v20120903/) zip file.
 - Unzip it.
-- Copy all jars from [Evolve Application Setup](docs/jar) folder to **JETTY_FOLDER/lib/ext** folder.
+- Copy all file from [docs/jar](docs/jar) folder to **JETTY_FOLDER/lib/ext** folder.
 - Copy [jetty-jndi.xml](docs/jetty-jndi.xml) file to **JETTY_FOLDER/etc** folder. 
 - Update start.ini file inside **JETTY_FOLDER** folder and add **etc/jetty-jndi.xml** at the end.
 - Update start.ini file inside **JETTY_FOLDER** folder and find *OPTIONS* attribute and add **jndi** at the end as shown below.
