@@ -29,7 +29,8 @@
 				function TransformFormats(row)    {
 					var JSON={};
                     var platformString = row.get('LARGE_STRING_VALUE');
-					var platformkeys = java.util.ArrayList();
+					var ArrayList = Java.type('java.util.ArrayList');
+					var platformkeys = new ArrayList();
 					if(platformString!= null){
 					    var parsablePlatfromString = "(" + platformString.toString() + ")";
 						var platforms= eval(parsablePlatfromString);
