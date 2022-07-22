@@ -78,15 +78,15 @@ tar \
     --group ${INSTALL_GROUP} \
     --directory ${SRCDIR}/ \
     --file ${SRCDIR}/@PAYLOAD_BASENAME@.tgz
-su --session-command="\
+
 tar \
---extract \
---gzip \
---strip-component=1 \
---verbose \
---directory ${INSTALL_ROOT}/ \
---file ${SRCDIR}/@RELEASE_ID@/$(</etc/default/evolve)/@PAYLOAD_BASENAME@.tgz \
-" ${INSTALL_USER}
+    --extract \
+    --gzip \
+    --strip-component=1 \
+    --verbose \
+    --directory ${INSTALL_ROOT}/ \
+    --file ${SRCDIR}/@RELEASE_ID@/$(</etc/default/evolve)/@PAYLOAD_BASENAME@.tgz
+
 #
 # setup log file
 #
