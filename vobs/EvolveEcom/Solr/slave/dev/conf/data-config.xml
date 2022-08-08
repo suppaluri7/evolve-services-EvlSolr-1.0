@@ -118,6 +118,28 @@
 					row.put('programCategoryId', programCategoryId);
 					return row;
 				}
+				function TransformRelatedProductResourceDetailsSpec(row){
+					var resourceKey = row.get('RESOURCE_KEY');
+					var name = row.get('NAME');
+					var resourceTypeKey = row.get('RESOURCE_TYPE_KEY');
+					var catalogProductTypeKey = row.get('CATALOG_PRODUCT_TYPE_KEY');
+
+					var relatedProductResourceDetails = "";
+					if(resourceKey != null){
+						relatedProductResourceDetails += (resourceKey + ",");
+					}
+					if(name != null){
+						relatedProductResourceDetails += (name + ",");
+					}
+					if(resourceTypeKey != null){
+						relatedProductResourceDetails += (resourceTypeKey + ",");
+					}
+					if(catalogProductTypeKey != null){
+						relatedProductResourceDetails += (catalogProductTypeKey);
+					}
+					row.put('relatedProductDetails', relatedProductResourceDetails);
+					return row;
+				}
     ]]></script>
 	<document>
 		<entity name="resource" 
