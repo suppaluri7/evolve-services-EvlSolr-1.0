@@ -163,6 +163,13 @@
 								and st.major_subject_code = '${base_product_resource.MAJOR_SUBJECT_CODE}'">
 					<field column="programCategoryId" name="programCategoryId"/>
 				</entity>
+				<entity name="related_product_resource_details" transformer="script:TransformRelatedProductResourceDetailsSpec"
+						query="select e.RESOURCE_KEY as RESOURCE_KEY,e.name as NAME, rt.resource_type_key as RESOURCE_TYPE_KEY,pt.catalog_product_type_key as CATALOG_PRODUCT_TYPE_KEY
+					from evladmin.evolve_resource e,evladmin.related_product p ,evladmin.resource_type rt,evladmin.BASE_PRODUCT_RESOURCE bpr, evladmin.product_type pt
+					where  e.resource_id=p.related_resource_id and bpr.resource_id=p.related_resource_id and relationship_type_id IN (1,2) and e.resource_type_id = rt.resource_type_id and pt.product_type_id = bpr.product_type_id
+					and p.resource_id='${resource.RESOURCE_ID}' order by pt.relevancy desc ">
+					<field name="relatedProductDetails" column="relatedProductDetails"/>
+				</entity>
                 <entity name="isbnJsonData"  transformer="ClobTransformer"
 						query="select jd.large_string_value from evladmin.json_data jd where 
 							jd.resource_id = '${resource.RESOURCE_ID}' and jd.name='isbn10'">
