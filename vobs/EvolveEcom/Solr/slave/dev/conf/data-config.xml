@@ -146,31 +146,31 @@
 
 					var relatedProductResourceDetails = "";
 					if(resourceKey != null){
-						relatedProductResourceDetails += (resourceKey + ",");
+						relatedProductResourceDetails += (resourceKey + ";");
 					}
 					if(name != null){
-						relatedProductResourceDetails += (name + ",");
+						relatedProductResourceDetails += (name + ";");
 					}
 					if(resourceTypeKey != null){
-						relatedProductResourceDetails += (resourceTypeKey + ",");
+						relatedProductResourceDetails += (resourceTypeKey + ";");
 					}
 					if(productTypeKey != null){
-						relatedProductResourceDetails += (productTypeKey + ",");
+						relatedProductResourceDetails += (productTypeKey + ";");
 					}
 					if(catalogProductTypeKey != null){
-						relatedProductResourceDetails += (catalogProductTypeKey + ",");
+						relatedProductResourceDetails += (catalogProductTypeKey + ";");
 					}
 					if(editionNumber != null){
-						relatedProductResourceDetails += (editionNumber + ",");
+						relatedProductResourceDetails += (editionNumber + ";");
 					}
 					if(copyRightYear != null){
-						relatedProductResourceDetails += (copyRightYear + ",");
+						relatedProductResourceDetails += (copyRightYear + ";");
 					}
 					if(evolvePrice != null){
-						relatedProductResourceDetails += (parseFloat(evolvePrice) + ",");
+						relatedProductResourceDetails += (parseFloat(evolvePrice) + ";");
 					}
 					if(ppmPriceCAD != null){
-						relatedProductResourceDetails += (parseFloat(ppmPriceCAD) + ",");
+						relatedProductResourceDetails += (parseFloat(ppmPriceCAD) + ";");
 					}
 					if(relevancy != null){
 						relatedProductResourceDetails += (relevancy);
