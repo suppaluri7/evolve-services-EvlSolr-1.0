@@ -117,6 +117,70 @@
 					row.put('programCategoryId', programCategoryId);
 					return row;
 				}
+				function TransformRelatedProductResourceDetailsSpec(row){
+					var resourceKey = row.get('RESOURCE_KEY');
+					var name = row.get('NAME');
+					var resourceTypeKey = row.get('RESOURCE_TYPE_KEY');
+					var productTypeKey = row.get('PRODUCT_TYPE_KEY');
+					var catalogProductTypeKey = row.get('CATALOG_PRODUCT_TYPE_KEY');
+					var editionNumber = row.get('EDITION_NUMBER');
+					var copyRightYear = row.get('COPYRIGHT_YEAR');
+					var relevancy = row.get('RELEVANCY');
+					var role = row.get('ROLE');
+					
+					var evolvePrice = row.get('PRICE');
+					var ppmPrice = row.get('PPM_PRICE');
+					var ppmPriceCAD = row.get('PPM_PRICE_CAD');
+
+					if(ppmPriceCAD == null){
+						ppmPriceCAD = "0.0";
+					}
+
+					if(evolvePrice == null){
+						evolvePrice = ppmPrice;
+					}
+
+                    if(evolvePrice == null){
+						evolvePrice = "0.0";
+					}
+
+					var relatedProductResourceDetails = "";
+					if(resourceKey != null){
+						relatedProductResourceDetails += (resourceKey + ";");
+					}
+					if(name != null){
+						relatedProductResourceDetails += (name + ";");
+					}
+					if(resourceTypeKey != null){
+						relatedProductResourceDetails += (resourceTypeKey + ";");
+					}
+					if(productTypeKey != null){
+						relatedProductResourceDetails += (productTypeKey + ";");
+					}
+					if(catalogProductTypeKey != null){
+						relatedProductResourceDetails += (catalogProductTypeKey + ";");
+					}
+					if(editionNumber != null){
+						relatedProductResourceDetails += (editionNumber + ";");
+					}
+					if(copyRightYear != null){
+						relatedProductResourceDetails += (copyRightYear + ";");
+					}
+					if(evolvePrice != null){
+						relatedProductResourceDetails += (parseFloat(evolvePrice) + ";");
+					}
+					if(ppmPriceCAD != null){
+						relatedProductResourceDetails += (parseFloat(ppmPriceCAD) + ";");
+					}
+					if(relevancy != null){
+						relatedProductResourceDetails += (relevancy + ";");
+					}					
+					if(role != null){
+						relatedProductResourceDetails += (role);
+					}
+					row.put('relatedProductDetails', relatedProductResourceDetails);
+					return row;
+				}
     ]]></script>
 	<document>
 		<entity name="resource" 
@@ -149,8 +213,8 @@
 						query= "select t.discipline_id as DISCIPLINE_ID,t.specialty_id as SPECIALTY_ID  from 
 								evladmin.disc_spec_peak_taxonomy t,evladmin.smart_taxonomy_sbu_pc_msc st 
 								where t.taxonomy_id = st.taxonomy_id 
-								and st.sbu_code = '${base_product_resource.SBU_CODE}' 
-								and st.profit_center_code = '${base_product_resource.PROFIT_CENTER_CODE}' 
+								and st.sbu_code = '${base_product_resource.SBU_CODE}'
+								and st.profit_center_code = '${base_product_resource.PROFIT_CENTER_CODE}'
 								and st.major_subject_code = '${base_product_resource.MAJOR_SUBJECT_CODE}'">
 						<field column="category_id" name="category_id"/>
 				</entity>
@@ -162,6 +226,14 @@
 								and st.profit_center_code = '${base_product_resource.PROFIT_CENTER_CODE}'
 								and st.major_subject_code = '${base_product_resource.MAJOR_SUBJECT_CODE}'">
 					<field column="programCategoryId" name="programCategoryId"/>
+				</entity>
+				<entity name="related_product_resource_details" transformer="script:TransformRelatedProductResourceDetailsSpec"
+						query="select distinct e.RESOURCE_KEY as RESOURCE_KEY,e.name as NAME, rt.resource_type_key as RESOURCE_TYPE_KEY,pt.product_type_key as PRODUCT_TYPE_KEY,pt.catalog_product_type_key as CATALOG_PRODUCT_TYPE_KEY,bpr.edition_number as EDITION_NUMBER,
+					bpr.copyright_year as COPYRIGHT_YEAR,bpr.ppm_price as PPM_PRICE, bpr.ppm_price_cad as PPM_PRICE_CAD, bpr.price as PRICE,pt.relevancy as RELEVANCY,er1.role_id as ROLE
+					from evladmin.evolve_resource e,evladmin.related_product p ,evladmin.resource_type rt,evladmin.BASE_PRODUCT_RESOURCE bpr, evladmin.product_type pt, evladmin.product_resource pr,evladmin.evolve_resource er1
+					where  e.resource_id=p.related_resource_id and bpr.resource_id=p.related_resource_id and pr.base_product_resource_id = p.related_resource_id and er1.resource_id = pr.resource_id and relationship_type_id IN (1,2) and bpr.pub_status_id not in (1,7) and (bpr.archived is null or bpr.archived = 'N') and e.resource_type_id = rt.resource_type_id and pt.product_type_id = bpr.product_type_id
+					and p.resource_id='${resource.RESOURCE_ID}' and pr.include_in_search_flag ='Y' and er1.published_flag='Y' order by pt.relevancy desc,pt.product_type_key,bpr.copyright_year desc ">
+					<field name="relatedProductDetails" column="relatedProductDetails"/>
 				</entity>
                 <entity name="isbnJsonData"  transformer="ClobTransformer"
 						query="select jd.large_string_value from evladmin.json_data jd where 
