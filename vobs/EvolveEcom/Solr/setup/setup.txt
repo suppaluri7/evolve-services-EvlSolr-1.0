@@ -17,7 +17,11 @@ Installation Steps for Evolve Solr Server:
 
 6.  Create lib folder in server/solr/evolve directory.
 
-6.  Copy ojdbc6.jar to server/solr/evolve/lib folder.
+7.  Copy ojdbc6.jar to server/solr/evolve/lib folder.
 
-7.  Copy solr.xml to server/solr folder.
+8.  Copy solr.xml to server/solr folder.
 
+9.  Copy overwrite all file in conf folder to server/solr/evolve/conf folder.
+
+10. Start Solr server using below command format
+    solr start -Devolve.db.url=jdbc:oracle:thin:@localhost:1522/EVDEVCS -Devolve.db.username=<dbuser>  -Devolve.db.password=<db pass>
