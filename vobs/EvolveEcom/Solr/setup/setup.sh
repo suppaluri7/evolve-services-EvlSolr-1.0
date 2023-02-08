@@ -1,30 +1,30 @@
 echo "Download solr 8.8.1 server."
-wget https://ftp.wayne.edu/apache/lucene/solr/8.8.1/solr-8.8.1.tgz
+wget https://ftp.wayne.edu/apache/lucene/solr/8.11.2/solr-8.11.2.tgz
 
 echo "Unzip solr installation file."
-tar -zxf solr-8.8.1.tgz
+tar -zxf solr-8.11.2.tgz
 
 echo "Start solr server."
-./solr-8.8.1/bin/solr start
+cd solr-8.11.2
+./bin/solr start
 
 echo "Create evolve collection."
-./solr-8.8.1/bin/solr create -c evolve
+./bin/solr create -c evolve
 
 echo "Stop solr server."
-./solr-8.8.1/bin/solr stop -all
+./bin/solr stop -all
 
-echo "Delete existing solr.xml from solr-8.8.1/server/solr folder"
-rm -rf solr-8.8.1/server/solr/solr.xml
+echo "Download evolve-solr-config.zip file"
+cp ../evolve-solr-config.zip .
 
-echo "Create lib folder in solr-8.8.1/server/solr/evolve folder"
-mkdir solr-8.8.1/server/solr/evolve/lib
+echo "Unzip Evolve solr config."
+unzip evolve-solr-config.zip
 
-echo "Copy solr.xml to solr-8.8.1/server/solr folder"
-cp solr.xml solr-8.8.1/server/solr
+echo "Copy evolve config"
+cp -rf evolve-solr-config/server .
 
-echo "Copy ojdbc6.jar to solr-8.8.1/server/solr/evolve/lib folder"
-cp ojdbc6.jar solr-8.8.1/server/solr/evolve/lib
+echo "Todo: Copy content from master/dev/conf folder to server/solr/evolve/conf folder"
+cp -rf ../../master/dev/conf server/solr/evolve/conf
 
-echo "Todo: Copy overwrite all file in conf folder to solr-8.8.1/server/solr/evolve/conf folder"
-
-echo "Todo: Start Solr, solr start -Devolve.db.url=jdbc:oracle:thin:@localhost:1522/EVDEVCS -Devolve.db.username=<dbuser>  -Devolve.db.password=<db pass>"
+echo "Todo: Start Solr, solr start -j --module=plus"
+./bin/solr start -j --module=plus
