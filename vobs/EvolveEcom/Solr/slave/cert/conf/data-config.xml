@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <dataConfig>
-    <dataSource type="JdbcDataSource" driver="oracle.jdbc.pool.OracleDataSource" url="${evolve.db.url}" user="${evolve.db.username}" password="${evolve.db.password}"/>
+    <dataSource name="jdbc" jndiName="jdbc/evolve" type="JdbcDataSource" />
     <script><![CDATA[
                 function TransformAuthor(row)    {
                     var firstName = row.get('FIRST_NAME');
