@@ -1,0 +1,27 @@
+Installation Steps for Evolve Solr Server:
+
+1.  Download solr-8.8.1 installation file to the server using below url.
+    UNIX: https://apache.osuosl.org/lucene/solr/8.8.1/solr-8.8.1.tgz
+    WINDOWS: https://apache.osuosl.org/lucene/solr/8.8.1/solr-8.8.1.zip
+
+2.  Unzip solr-8.8.1 installation file.
+
+3.  Start solr server by running below command.
+    bin/solr start
+
+4.  Create evolve collection using below command.
+    bin/solr create -c evolve
+
+5.  Stop solr server using below command.
+    bin/solr stop -all
+
+6.  Create lib folder in server/solr/evolve directory.
+
+7.  Copy ojdbc6.jar to server/solr/evolve/lib folder.
+
+8.  Copy solr.xml to server/solr folder.
+
+9.  Copy overwrite all file in conf folder to server/solr/evolve/conf folder.
+
+10. Start Solr server using below command format
+    solr start -Devolve.db.url=jdbc:oracle:thin:@localhost:1522/EVDEVCS -Devolve.db.username=<dbuser>  -Devolve.db.password=<db pass>
