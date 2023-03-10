@@ -108,7 +108,7 @@ tar \
     --file ${SRCDIR}/@RELEASE_ID@/${BUILD_ENV}/@PAYLOAD_BASENAME@.tgz
 
 
-function prep_nohup_logs {
+function prep_nohup_logs() {
     SOLR_PATH="/opt/solr";
     SOLR_CURRENT="${SOLR_PATH}/current";
     SOLR_SERVER="${SOLR_CURRENT}/server";
@@ -123,7 +123,7 @@ function prep_nohup_logs {
     echo "${NOHUP_LOG}";
 }
 
-function solr_stop {
+function solr_stop() {
     NOHUP_LOG="$(prep_nohup_logs)";
     printf "%s\n" "Stopping Solr: Installing @RELEASE_ID@ $(date)" >> "${NOHUP_LOG}";
     # solr_pid="$(/opt/solr/current/bin/solr status | grep "Solr process" | awk '{ print $3 }')";
@@ -139,7 +139,7 @@ function solr_stop {
     fi
 }
 
-function solr_clean {
+function solr_clean() {
     # We believe this routine is not needed, with Solr 8.
     #
     # jetty_work_dir=/tmp
@@ -151,10 +151,11 @@ function solr_clean {
     #     ls -ld ${servlet_context_tempdir}
     #     rm -rf ${servlet_context_tempdir}
     # fi
+    printf "Nothing to clean. Skipping solr_clean() routine.\n";
 }
 
     # su evolve -c "cd /opt/solr/current && ./bin/solr start -j --module=plus -p 8081 -Dsolr.disable.shardsWhitelist=true";
-function solr_start {
+function solr_start() {
     local NOHUP_LOG="$(prep_nohup_logs)";
     local start_cmd="/opt/solr/current/bin/solr start -j --module=plus -p 8081 -Dsolr.disable.shardsWhitelist=true";
     nohup su evolve -c "${start_cmd}" </dev/null >> "${NOHUP_LOG}" 2>&1 &
