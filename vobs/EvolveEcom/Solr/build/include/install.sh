@@ -107,6 +107,8 @@ tar \
     --directory ${INSTALL_ROOT}/ \
     --file ${SRCDIR}/@RELEASE_ID@/${BUILD_ENV}/@PAYLOAD_BASENAME@.tgz
 
+SOLR_PATH="/opt/solr";
+chown -R "${INSTALL_USER}:${INSTALL_USER}" "${SOLR_PATH}/";
 
 function prep_nohup_logs() {
     SOLR_PATH="/opt/solr";
