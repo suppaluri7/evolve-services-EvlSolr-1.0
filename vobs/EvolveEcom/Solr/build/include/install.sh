@@ -77,8 +77,6 @@ chmod 755 ${SRCDIR}
 # 4. If we have an $EVOLVE_BUILD_ENV variable set already, just use that.
 # 5. Otherwise, we'll fall back to whichever default we established.
 DEFAULT_BUILD_ENV="";
-EVOLVE_BUILD_ENV="";
-BUILD_ENV="";
 if [ -r "/etc/default/buildenv" ]; then
     DEFAULT_BUILD_ENV="$(</etc/default/buildenv)";
 elif [ -r "/etc/default/evolve" ]; then
@@ -86,8 +84,8 @@ elif [ -r "/etc/default/evolve" ]; then
 else
     DEFAULT_BUILD_ENV="dev";
 fi;
-BUILD_ENV="${EVOLVE_BUILD_ENV:-${DEFAULT_BUILD_ENV}}";
-printf "\n*****\nBuild Environment = %s\n*****\n\n" "${BUILD_ENV}";
+EVOLVE_BUILD_ENV="${EVOLVE_BUILD_ENV:-${DEFAULT_BUILD_ENV}}";
+printf "\n*****\nBuild Environment = %s\n*****\n\n" "${EVOLVE_BUILD_ENV}";
 
 tar \
     --extract \
@@ -105,7 +103,7 @@ tar \
     --strip-component=1 \
     --verbose \
     --directory ${INSTALL_ROOT}/ \
-    --file ${SRCDIR}/@RELEASE_ID@/${BUILD_ENV}/@PAYLOAD_BASENAME@.tgz
+    --file ${SRCDIR}/@RELEASE_ID@/${EVOLVE_BUILD_ENV}/@PAYLOAD_BASENAME@.tgz
 
 SOLR_PATH="/opt/solr";
 chown -R "${INSTALL_USER}:${INSTALL_USER}" "${SOLR_PATH}/";
