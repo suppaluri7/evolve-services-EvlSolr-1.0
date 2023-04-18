@@ -106,15 +106,15 @@ tar \
     --file ${SRCDIR}/@RELEASE_ID@/${EVOLVE_BUILD_ENV}/@PAYLOAD_BASENAME@.tgz
 
 SOLR_PATH="/opt/solr";
-chown -R "${INSTALL_USER}:${INSTALL_USER}" "${SOLR_PATH}/";
+chown -R "${INSTALL_USER}:${INSTALL_GROUP}" "${SOLR_PATH}/";
+chown "${INSTALL_USER}:${INSTALL_GROUP}" "${INSTALL_ROOT}/";
 
 function prep_nohup_logs() {
-    SOLR_PATH="/opt/solr";
-    SOLR_CURRENT="${SOLR_PATH}/current";
-    SOLR_SERVER="${SOLR_CURRENT}/server";
-    SOLR_SERVER_LOGS="${SOLR_SERVER}/logs";
+    SOLR_VAR_PATH="/var/solr";
+    SOLR_SERVER_LOGS="${SOLR_VAR_PATH}/logs";
     LOGFILE_NOHUP="nohup_jetty_start.log";
 
+    #/var/solr/logs/nohup_jetty_start.log
     NOHUP_LOG="${SOLR_SERVER_LOGS}/${LOGFILE_NOHUP}";
 
     touch "${NOHUP_LOG}";
@@ -126,12 +126,11 @@ function prep_nohup_logs() {
 function solr_stop() {
     NOHUP_LOG="$(prep_nohup_logs)";
     printf "%s\n" "Stopping Solr: Installing @RELEASE_ID@ $(date)" >> "${NOHUP_LOG}";
-    # solr_pid="$(/opt/solr/current/bin/solr status | grep "Solr process" | awk '{ print $3 }')";
-    # solr_pid=$(ps --noheader -C java --format pid,cmd | sed --silent -e '/^  */s///' -e '/jetty/s/ .*$//p')
-    solr_pid="$(ps --noheader -C java --format pid)";
+    # solr_pid="$(ps -C java --format pid,cmd | grep solr | awk '{ print $1 }')";
+    solr_pid="$(service solr status | grep "Solr process" | awk '{ print $3 }')";
 
     if
-        ! timeout 60 su evolve -c "cd /opt/solr/current && ./bin/solr stop -p 8081";
+        ! timeout 60 service solr stop;
     then
         if [[ -n "${solr_pid}" ]] && kill -0 "${solr_pid}"; then
             kill -9 "${solr_pid}";
@@ -141,24 +140,14 @@ function solr_stop() {
 
 function solr_clean() {
     # We believe this routine is not needed, with Solr 8.
-    #
-    # jetty_work_dir=/tmp
-    # if [[ -d ${JETTY_HOME}/work ]]; then
-    #     jetty_work_dir=${JETTY_HOME}/work
-    # fi
-    # servlet_context_tempdir=${jetty_work_dir}/jetty-0.0.0.0-8080-solr.war-_solr-any-/
-    # if [[ -e ${servlet_context_tempdir} ]]; then
-    #     ls -ld ${servlet_context_tempdir}
-    #     rm -rf ${servlet_context_tempdir}
-    # fi
     printf "Nothing to clean. Skipping solr_clean() routine.\n";
 }
 
-    # su evolve -c "cd /opt/solr/current && ./bin/solr start -j --module=plus -p 8081 -Dsolr.disable.shardsWhitelist=true";
 function solr_start() {
+    #/var/solr/logs/nohup_jetty_start.log
     local NOHUP_LOG="$(prep_nohup_logs)";
-    local start_cmd="/opt/solr/current/bin/solr start -j --module=plus -p 8081 -Dsolr.disable.shardsWhitelist=true";
-    nohup su evolve -c "${start_cmd}" </dev/null >> "${NOHUP_LOG}" 2>&1 &
+    local start_cmd="service solr start";
+    nohup "${start_cmd}" </dev/null >> "${NOHUP_LOG}" 2>&1 &
     set +x;
     typeset -i interval=5;
     for ((elapsed=0 ;  elapsed < ${MAX_WAIT_JETTY_START:=120} ; elapsed += interval ));
