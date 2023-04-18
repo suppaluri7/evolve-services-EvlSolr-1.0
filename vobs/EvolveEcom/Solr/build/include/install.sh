@@ -146,7 +146,7 @@ function solr_start() {
     #/var/solr/logs/nohup_jetty_start.log
     local NOHUP_LOG="$(prep_nohup_logs)";
     local start_cmd="service solr start";
-    nohup "${start_cmd}" </dev/null >> "${NOHUP_LOG}" 2>&1 &
+    nohup ${start_cmd} </dev/null >> "${NOHUP_LOG}" 2>&1 &
     set +x;
     typeset -i interval=5;
     for ((elapsed=0 ;  elapsed < ${MAX_WAIT_JETTY_START:=120} ; elapsed += interval ));
