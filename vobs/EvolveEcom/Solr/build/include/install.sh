@@ -107,7 +107,7 @@ tar \
 
 SOLR_PATH="/opt/solr";
 chown -R "${INSTALL_USER}:${INSTALL_GROUP}" "${SOLR_PATH}/";
-chown "${INSTALL_USER}:${INSTALL_GROUP}" "${INSTALL_ROOT}/";
+chown -R "${INSTALL_USER}:${INSTALL_GROUP}" "${INSTALL_ROOT}/";
 
 function prep_nohup_logs() {
     SOLR_VAR_PATH="/var/solr";
