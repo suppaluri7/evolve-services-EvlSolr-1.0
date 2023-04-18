@@ -4,7 +4,6 @@
 # Then stops jetty service, removes work files, and restarts jetty service
 #
 # /etc/default/evolve: Contains environment specification like dev, cert, or prod
-# /etc/default/jetty: Contains jetty environment variables, JETTY_LOGS and JETTY_HOME
 #
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 export PS4="# $(basename $0)[\${LINENO}]: "
