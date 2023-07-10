@@ -38,7 +38,7 @@ This repo contains code changes related to Evolve Solr component. Evolve uses so
   unzip evolve-solr-config.zip
   xcopy /e /k /h /i evolve-solr-config\server server /Y
   ```
-* Copy Solr configuration from repo to server/solr/evolve/conf folder. **FOLDER_PATH** is path of `EVOLVE_SOLR_GIT_REPO\vobs\EvolveEcom\Solr` folder location.
+* Copy Solr configuration from repo to server\solr\evolve\conf folder. **FOLDER_PATH** is path of `EVOLVE_SOLR_GIT_REPO\vobs\EvolveEcom\Solr` folder location.
   ```cmd
   xcopy /e /k /h /i /Y "<FOLDER_PATH>\master\dev\conf" server\solr\evolve\conf
   ```
