@@ -32,13 +32,13 @@ This repo contains code changes related to Evolve Solr component. Evolve uses so
   bin\solr stop -all
   ```
   
-* Copy evolve-solr-config.zip and unzip it. **FOLDER_PATH** is the path of folder containing evolve-solr-config.zip file which exist inside `EVOLVE_SOLR_GIT_REPO/vobs/EvolveEcom/Solr/setup` folder location.
+* Copy evolve-solr-config.zip and unzip it. **FOLDER_PATH** is the path of folder containing evolve-solr-config.zip file which exist inside `EVOLVE_SOLR_GIT_REPO\vobs\EvolveEcom\Solr\setup` folder location.
   ```cmd
-  copy <FOLDER_PATH>/evolve-solr-config.zip
+  copy <FOLDER_PATH>\evolve-solr-config.zip
   unzip evolve-solr-config.zip
   xcopy /e /k /h /i evolve-solr-config\server server /Y
   ```
-* Copy Solr configuration from repo to server/solr/evolve/conf folder. **FOLDER_PATH** is path of `EVOLVE_SOLR_GIT_REPO/vobs/EvolveEcom/Solr` folder location.
+* Copy Solr configuration from repo to server/solr/evolve/conf folder. **FOLDER_PATH** is path of `EVOLVE_SOLR_GIT_REPO\vobs\EvolveEcom\Solr` folder location.
   ```cmd
   xcopy /e /k /h /i /Y "<FOLDER_PATH>\master\dev\conf" server\solr\evolve\conf
   ```
