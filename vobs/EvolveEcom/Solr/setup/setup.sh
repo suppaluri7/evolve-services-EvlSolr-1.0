@@ -24,7 +24,7 @@ echo "Copy evolve config"
 cp -rf evolve-solr-config/server .
 
 echo "Todo: Copy content from master/dev/conf folder to server/solr/evolve/conf folder"
-cp -rf ../../master/dev/conf server/solr/evolve/conf
+cp -rf ../../master/dev/conf/* server/solr/evolve/conf
 
 echo "Start Solr server"
 ./bin/solr start -j --module=plus

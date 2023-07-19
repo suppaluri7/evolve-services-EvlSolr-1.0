@@ -8,8 +8,11 @@ This repo contains code changes related to Evolve Solr component. Evolve uses so
 
 ## UNIX or MAC or WSL Setup
 
-* Download solr-8.11.2 installation file to the server using below url. <br>
+* Download solr-8.11.2 installation file to the server using below url.
   **On UNIX:** https://dlcdn.apache.org/lucene/solr/8.11.2/solr-8.11.2.tgz
+  ```shell
+  wget https://dlcdn.apache.org/lucene/solr/8.11.2/solr-8.11.2.tgz
+  ```
 
 * Unzip solr-8.11.2 installation file.
   ```shell
@@ -41,7 +44,7 @@ This repo contains code changes related to Evolve Solr component. Evolve uses so
 
 * Copy Solr configuration from repo to server/solr/evolve/conf folder. **FOLDER_PATH** is path of `EVOLVE_SOLR_GIT_REPO/vobs/EvolveEcom/Solr` folder location.
   ```shell
-  cp -rf <FOLDER_PATH>/master/dev/conf server/solr/evolve/conf
+  cp -rf <FOLDER_PATH>/master/dev/conf/* server/solr/evolve/conf
   ```
 
 * Open **server\etc\evolve-jetty-jndi.xml** in vi or nano and update it as per environment. <br> We need to replace below text to their actual value.<br>
