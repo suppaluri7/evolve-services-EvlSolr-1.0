@@ -1,4 +1,4 @@
-echo "Download solr 8.8.1 server."
+echo "Download solr 8.11.2 server."
 wget https://dlcdn.apache.org/lucene/solr/8.11.2/solr-8.11.2.tgz
 
 echo "Unzip solr installation file."
