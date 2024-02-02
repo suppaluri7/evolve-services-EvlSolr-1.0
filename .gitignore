@@ -1,0 +1,5 @@
+/.idea/
+/*.iml
+
+/vobs/EvolveEcom/Solr/Stage
+*.scm.properties
