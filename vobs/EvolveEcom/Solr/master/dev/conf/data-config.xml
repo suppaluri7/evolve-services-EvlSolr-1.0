@@ -196,16 +196,18 @@
                 <field column="RESOURCE_TYPE_KEY"  name="type" />
             </entity>
             <entity name="base_product_resource" transformer="script:TransformPriceAndEdition"
-                query="select ppm_price,ppm_price_cad, (case when ppm_price is not null then ppm_price else price end) as price,product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,pub_status_id,copyright_year,edition_number,
-                                                sbu_code,profit_center_code,major_subject_code,archived 
-                        from evladmin.base_product_resource
-                        where resource_id='${resource.RESOURCE_ID}'">
+                    query= "select ppm_price,ppm_price_cad, (case when ppm_price is not null then ppm_price else price end) as price,
+						    product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,
+					    	pub_status_id,next_edition_isbn,copyright_year,edition_number,sbu_code,profit_center_code,major_subject_code,archived
+					    	from evladmin.base_product_resource
+					    	where resource_id='${resource.RESOURCE_ID}'">
                 <field column="PPM_PRICE"  name="ppmPrice"/>
                 <field column="PPM_PRICE_CAD"  name="ppmPriceCAD"/>
                 <field column="PRICE"  name="evolvePrice"/>
                 <field column="PUB_DATE" name="pubDate"/>
                 <field column="PUB_STATUS_ID" name="pubStatusId"/>
                 <field column="COPYRIGHT_YEAR" name="copyYear"/>
+                <field column="NEXT_EDITION_ISBN" name="nextEditionIsbn"/>
                 <field column="listPrice" name="listPrice"/>
                 <field column="edition" name="edition"/>
                 <field column="archived" name="archived"/>
