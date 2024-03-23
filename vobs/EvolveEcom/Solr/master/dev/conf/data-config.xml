@@ -333,8 +333,8 @@
                     <field name="nextEditionDetails" column="nextEditionDetails"/>
                 </entity>
                 <entity name="isbnJsonData" transformer="ClobTransformer"
-                        query="select jd.large_string_value from evladmin.json_data jd where
-                               jd.resource_id = '${resource.RESOURCE_ID}' and jd.name='isbn10'">
+                        query="select jd.large_string_value from evladmin.json_data jd
+                               where jd.resource_id = '${resource.RESOURCE_ID}' and jd.name='isbn10'">
                     <field column="LARGE_STRING_VALUE" clob="true" name="isbn10" />
                 </entity>
                 <entity name="contactOriginJsonData" transformer="ClobTransformer,script:TransformOrigin"
