@@ -170,8 +170,10 @@
     <field name="modifiedByFaculty" type="string" indexed="true" stored="true" multiValued="true"/>
     <field name="modifiedDateFaculty" type="string" indexed="true" stored="true" multiValued="true"/>
     <field name="category_id" type="string" indexed="true" stored="true" multiValued="true"/>
+    <field name="programCategoryId" type="string" indexed="true" stored="true" multiValued="true"/>
+    <field name="relatedProductDetails" type="string" indexed="true" stored="true" multiValued="true"/>
+    <field name="nextEditionDetails" type="string" indexed="true" stored="true" multiValued="true"/>
     <field name="archived" default="" type="string" indexed="true" stored="true"/>
-    <field name="nextEditionIsbn" default= "" type="string" indexed="true" stored="true"/>
     <!-- samals : Added the following schema definition for evolve -->
 
 
