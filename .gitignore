@@ -1,5 +1,14 @@
-/.idea/
-/*.iml
+/.idea
+**/out
+**/*.log
+*.iml
 
-/vobs/EvolveEcom/Solr/Stage
-*.scm.properties
+/.project
+/.settings
+*.class
+bin/
+classes/
+
+/vobs/EvolveEcom/Solr/stage
+/vobs/EvolveEcom/stage
+**/*.scm.properties
