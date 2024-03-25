@@ -1,56 +1,105 @@
-# Evolve Solr Service
+# Evolve Solr
 
-## Development Setup
+This repo contains code changes related to Evolve Solr component. Evolve uses solr for performing search related to products.
 
-**Prerequisite:**
+## Prerequisite
 
-- Make sure you already configure your machine to connect to evolve DEV oracle database server.
-- Install Java Runtime Environment (JRE) version 1.8 or higher
+* Java Runtime Environment (JRE) version 1.8 or higher.
 
-**Install Jetty:**
+## UNIX or MAC or WSL Setup
 
-- Download [Jetty 7.6.6](https://repo1.maven.org/maven2/org/eclipse/jetty/jetty-distribution/7.6.6.v20120903/) zip file.
-- Unzip it.
-- Copy all file from [<CHECKOUT_REPO_FOLDER>/docs/jar](docs/jar) folder to **JETTY_FOLDER/lib/ext** folder.
-- Copy [<CHECKOUT_REPO_FOLDER>/docs/jetty-jndi.xml](docs/jetty-jndi.xml) file to **JETTY_FOLDER/etc** folder. 
-- Update start.ini file inside **JETTY_FOLDER** folder and add **etc/jetty-jndi.xml** at the end.
-- Update start.ini file inside **JETTY_FOLDER** folder and find *OPTIONS* attribute and add **jndi** at the end as shown below.
-```
-#===========================================================
-# Start classpath OPTIONS.
-# These control what classes are on the classpath
-# for a full listing do
-#   java -jar start.jar --list-options
-#-----------------------------------------------------------
-OPTIONS=Server,jsp,jmx,resources,websocket,ext,jndi
-#-----------------------------------------------------------
-```
+* Download solr-8.11.2 installation file to the server using below url.
+  **On UNIX:** https://dlcdn.apache.org/lucene/solr/8.11.2/solr-8.11.2.tgz
+  ```shell
+  wget https://dlcdn.apache.org/lucene/solr/8.11.2/solr-8.11.2.tgz
+  ```
 
+* Unzip solr-8.11.2 installation file.
+  ```shell
+  tar -zxf solr-8.11.2.tgz
+  ```
 
-**Install Solr:**
+* Start solr server by running below command.
+  ```cmd
+  cd solr-8.11.2
+  ./bin/solr start
+  ```
 
-- Download [Solr 3.6.1](https://archive.apache.org/dist/lucene/solr/3.6.1/) zip file.
-- Copy apache-solr-3.6.1.war file from SOLR_FOLDER/dist directory to JETTY_FOLDER/webapps folder.
-- Rename apache-solr-3.6.1.war in JETTY_FOLDER/webapps to solr.war.
-- Create solr folder in JETTY_FOLDER directory.
-- Copy [<CHECKOUT_REPO_FOLDER>/docs/solr.xml](docs/solr.xml) from  to JETTY_FOLDER/solr directory.
-- Copy SOLR_FOLDER/dist directory to JETTY_FOLDER/solr directory.
-- Copy SOLR_FOLDER/contrib directory to JETTY_FOLDER/solr directory.
-- Copy [<CHECKOUT_REPO_FOLDER>/vobs/EvolveEcom/Solr/master/dev/conf](vobs/EvolveEcom/Solr/master/dev/conf) folder to JETTY_FOLDER/solr directory.
-- Copy all content [<CHECKOUT_REPO_FOLDER>/docs/conf](docs/conf) directory to JETTY_FOLDER/solr/conf directory.
+* Create **Evolve Solr** collection using below command.
+  ```cmd
+  ./bin/solr create -c evolve
+  ```
 
-**Start Solr Server:**
+* Stop solr server using below command.
+  ```shell
+  ./bin/solr stop -all
+  ```
 
-- Open command prompt and go to JETTY_FOLDER directory.
-- Run below command to start solr server. 
-```
-java -jar start.jar -Devolve.db.url=<EVOLVE_ORACLE_DB_URL>  -Devolve.db.username=<EVOLVE_ORACLE_USERNAME> -Devolve.db.password=<EVOLVE_ORACLE_PASSWORD> -Dsolr.solr.home=<SOLR_CONFIG_HOME_FOLDER>
+* Copy evolve-solr-config.zip and unzip it. **FOLDER_PATH** is the path of folder containing evolve-solr-config.zip file which exist inside `EVOLVE_SOLR_GIT_REPO/vobs/EvolveEcom/Solr/setup` folder location.
+  ```shell
+  cp <FOLDER_PATH>/evolve-solr-config.zip .
+  unzip evolve-solr-config.zip
+  cp -rf evolve-solr-config/server .
+  ```
 
-EVOLVE_ORACLE_DB_URL is the DB URL for ex: jdbc:oracle:thin:@localhost:1522/EVDEVCS
-EVOLVE_ORACLE_USERNAME is the DB username
-EVOLVE_ORACLE_PASSWORD is the DB password
-SOLR_CONFIG_HOME_FOLDER is the path until JETTY_FOLDER/solr directory
+* Copy Solr configuration from repo to server/solr/evolve/conf folder. **FOLDER_PATH** is path of `EVOLVE_SOLR_GIT_REPO/vobs/EvolveEcom/Solr` folder location.
+  ```shell
+  cp -rf <FOLDER_PATH>/master/dev/conf/* server/solr/evolve/conf
+  ```
 
-Ex: java -jar start.jar -Devolve.db.url=jdbc:oracle:thin:@localhost:1522/EVDEVCS -Devolve.db.username=xxxx -Devolve.db.password=xxxxx -Dsolr.solr.home=<SOLR_CONFIG_HOME_FOLDER>
-```
-- Now open [http://localhost:8080/solr](http://localhost:8080/solr) browser.
+* Open **server\etc\evolve-jetty-jndi.xml** in vi or nano and update it as per environment. <br> We need to replace below text to their actual value.<br>
+  **EVOLVE_DB_URL** - Replace it with actual database JDBC URL.<br>
+  **EVOLVE_DB_USERNAME** - Replace it with database username.<br>
+  **EVOLVE_DB_PASSWORD** - Replace it with database password.
+
+* Start Solr server
+  ```shell
+  ./bin/solr start -j --module=plus
+  ```
+
+## Windows Setup
+
+* Download solr-8.11.2 installation file to the server using below url. <br>
+  **On WINDOWS:** https://www.apache.org/dyn/closer.lua/lucene/solr/8.11.2/solr-8.11.2.zip?action=download
+  
+* Unzip solr-8.11.2 installation file.
+  ```cmd
+  unzip solr-8.11.2.tgz
+  ```
+  
+* Start solr server by running below command.
+  ```cmd
+  cd solr-8.11.2
+  bin\solr start
+  ```
+  
+* Create **Evolve Solr** collection using below command.
+  ```cmd
+  bin\solr create -c evolve
+  ```
+  
+* Stop solr server using below command.
+  ```cmd
+  bin\solr stop -all
+  ```
+  
+* Copy evolve-solr-config.zip and unzip it. **FOLDER_PATH** is the path of folder containing evolve-solr-config.zip file which exist inside `EVOLVE_SOLR_GIT_REPO\vobs\EvolveEcom\Solr\setup` folder location.
+  ```cmd
+  copy <FOLDER_PATH>\evolve-solr-config.zip
+  unzip evolve-solr-config.zip
+  xcopy /e /k /h /i evolve-solr-config\server server /Y
+  ```
+* Copy Solr configuration from repo to server\solr\evolve\conf folder. **FOLDER_PATH** is path of `EVOLVE_SOLR_GIT_REPO\vobs\EvolveEcom\Solr` folder location.
+  ```cmd
+  xcopy /e /k /h /i /Y "<FOLDER_PATH>\master\dev\conf" server\solr\evolve\conf
+  ```
+
+* Open **server\etc\evolve-jetty-jndi.xml** in NotePad++ and update it as per environment. <br> We need to replace below text to their actual value.<br>
+  **EVOLVE_DB_URL** - Replace it with actual database JDBC URL.<br>
+  **EVOLVE_DB_USERNAME** - Replace it with database username.<br>
+  **EVOLVE_DB_PASSWORD** - Replace it with database password.
+  
+* Start Solr server
+  ```cmd
+  bin\solr start -j "--module=plus"
+  ```
