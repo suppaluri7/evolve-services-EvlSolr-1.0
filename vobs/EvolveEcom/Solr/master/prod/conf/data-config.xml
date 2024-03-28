@@ -6,7 +6,7 @@
             var firstName = row.get('FIRST_NAME');
             var lastName = row.get('LAST_NAME');
             var degrees = row.get('DEGREE_LETTERS');
-             var author = '';
+            var author = '';
             if (firstName != null) {
                 author += firstName;
             }
@@ -317,19 +317,19 @@
                                pt.product_type_key as PRODUCT_TYPE_KEY, pt.catalog_product_type_key as CATALOG_PRODUCT_TYPE_KEY,
                                bpr.edition_number as EDITION_NUMBER, bpr.copyright_year as COPYRIGHT_YEAR,
                                bpr.ppm_price as PPM_PRICE, bpr.ppm_price_cad as PPM_PRICE_CAD,
-                               bpr.price as PRICE, er1.role_id as ROLE
+                               bpr.price as PRICE, e.role_id as ROLE
                                from evladmin.evolve_resource e, evladmin.resource_type rt, evladmin.BASE_PRODUCT_RESOURCE bpr,
-                               evladmin.product_type pt, evladmin.product_resource pr, evladmin.evolve_resource er1
+                               evladmin.product_type pt, evladmin.product_resource pr
                                where e.resource_key='${base_product_resource.NEXT_EDITION_ISBN}'
-                               and e.resource_type_id=5
-                               and bpr.resource_id=e.resource_id
+                               and e.resource_type_id IN (1,2)
+                               and e.resource_id = pr.resource_id
+                               and e.resource_type_id = rt.resource_type_id
+                               and pr.base_product_resource_id = bpr.resource_id
+                               and pt.product_type_id = bpr.product_type_id
                                and bpr.pub_status_id not in (1,7)
                                and (bpr.archived is null or bpr.archived = 'N')
-                               and e.resource_type_id = rt.resource_type_id
-                               and pt.product_type_id = bpr.product_type_id
-                               and er1.resource_id = pr.resource_id
                                and pr.include_in_search_flag ='Y'
-                               and er1.published_flag='Y'">
+                               and e.published_flag='Y'">
                     <field name="nextEditionDetails" column="nextEditionDetails"/>
                 </entity>
                 <entity name="isbnJsonData" transformer="ClobTransformer"
