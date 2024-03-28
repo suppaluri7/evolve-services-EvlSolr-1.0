@@ -61,15 +61,12 @@
             if (ppmPriceCAD == null) {
                 ppmPriceCAD = "0.0";
             }
-
             if (evolvePrice == null) {
                 evolvePrice = ppmPrice;
             }
-
             if (evolvePrice == null) {
                 evolvePrice = "0.0";
             }
-
             if (edition == null) {
                 edition = "1.0";
             }
@@ -147,6 +144,7 @@
             if (evolvePrice == null) {
                 evolvePrice = "0.0";
             }
+
             var relatedProductResourceDetails = "";
             if (resourceKey != null) {
                 relatedProductResourceDetails += (resourceKey + ";");
@@ -207,6 +205,7 @@
             if (evolvePrice == null) {
                 evolvePrice = "0.0";
             }
+
             var nextEditionDetails = "";
             if (resourceKey != null) {
                 nextEditionDetails += (resourceKey + ";");
@@ -258,11 +257,11 @@
                 <field column="RESOURCE_TYPE_KEY" name="type" />
             </entity>
             <entity name="base_product_resource" transformer="script:TransformPriceAndEdition"
-                    query= "select ppm_price,ppm_price_cad, (case when ppm_price is not null then ppm_price else price end) as price,
-                            product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,
-                            pub_status_id,next_edition_isbn,copyright_year,edition_number,sbu_code,profit_center_code,major_subject_code,archived
-                            from evladmin.base_product_resource
-                            where resource_id='${resource.RESOURCE_ID}'">
+                    query="select ppm_price,ppm_price_cad, (case when ppm_price is not null then ppm_price else price end) as price,
+                           product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,
+                           pub_status_id,next_edition_isbn,copyright_year,edition_number,sbu_code,profit_center_code,major_subject_code,archived
+                           from evladmin.base_product_resource
+                           where resource_id='${resource.RESOURCE_ID}'">
                 <field column="PPM_PRICE" name="ppmPrice"/>
                 <field column="PPM_PRICE_CAD" name="ppmPriceCAD"/>
                 <field column="PRICE" name="evolvePrice"/>
@@ -272,13 +271,13 @@
                 <field column="listPrice" name="listPrice"/>
                 <field column="edition" name="edition"/>
                 <field column="archived" name="archived"/>
-                <entity name = "disciplineSpeciality" transformer="script:TransformDiscSpec"
-                        query= "select t.discipline_id as DISCIPLINE_ID,t.specialty_id as SPECIALTY_ID
-                                from evladmin.disc_spec_peak_taxonomy t,evladmin.smart_taxonomy_sbu_pc_msc st
-                                where t.taxonomy_id = st.taxonomy_id
-                                and st.sbu_code = '${base_product_resource.SBU_CODE}'
-                                and st.profit_center_code = '${base_product_resource.PROFIT_CENTER_CODE}'
-                                and st.major_subject_code = '${base_product_resource.MAJOR_SUBJECT_CODE}'">
+                <entity name="disciplineSpeciality" transformer="script:TransformDiscSpec"
+                        query="select t.discipline_id as DISCIPLINE_ID,t.specialty_id as SPECIALTY_ID
+                               from evladmin.disc_spec_peak_taxonomy t,evladmin.smart_taxonomy_sbu_pc_msc st
+                               where t.taxonomy_id = st.taxonomy_id
+                               and st.sbu_code = '${base_product_resource.SBU_CODE}'
+                               and st.profit_center_code = '${base_product_resource.PROFIT_CENTER_CODE}'
+                               and st.major_subject_code = '${base_product_resource.MAJOR_SUBJECT_CODE}'">
                     <field column="category_id" name="category_id"/>
                 </entity>
                 <entity name="programTaxonomy" transformer="script:TransformProgramTaxonomySpec"
@@ -318,19 +317,19 @@
                                pt.product_type_key as PRODUCT_TYPE_KEY, pt.catalog_product_type_key as CATALOG_PRODUCT_TYPE_KEY,
                                bpr.edition_number as EDITION_NUMBER, bpr.copyright_year as COPYRIGHT_YEAR,
                                bpr.ppm_price as PPM_PRICE, bpr.ppm_price_cad as PPM_PRICE_CAD,
-                               bpr.price as PRICE, er1.role_id as ROLE
+                               bpr.price as PRICE, e.role_id as ROLE
                                from evladmin.evolve_resource e, evladmin.resource_type rt, evladmin.BASE_PRODUCT_RESOURCE bpr,
-                               evladmin.product_type pt, evladmin.product_resource pr, evladmin.evolve_resource er1
+                               evladmin.product_type pt, evladmin.product_resource pr
                                where e.resource_key='${base_product_resource.NEXT_EDITION_ISBN}'
-                               and e.resource_type_id=5
-                               and bpr.resource_id=e.resource_id
+                               and e.resource_type_id IN (1,2)
+                               and e.resource_id = pr.resource_id
+                               and e.resource_type_id = rt.resource_type_id
+                               and pr.base_product_resource_id = bpr.resource_id
+                               and pt.product_type_id = bpr.product_type_id
                                and bpr.pub_status_id not in (1,7)
                                and (bpr.archived is null or bpr.archived = 'N')
-                               and e.resource_type_id = rt.resource_type_id
-                               and pt.product_type_id = bpr.product_type_id
-                               and er1.resource_id = pr.resource_id
                                and pr.include_in_search_flag ='Y'
-                               and er1.published_flag='Y'">
+                               and e.published_flag='Y'">
                     <field name="nextEditionDetails" column="nextEditionDetails"/>
                 </entity>
                 <entity name="isbnJsonData" transformer="ClobTransformer"
