@@ -129,7 +129,7 @@
             var catalogProductTypeKey = row.get('CATALOG_PRODUCT_TYPE_KEY');
             var editionNumber = row.get('EDITION_NUMBER');
             var copyRightYear = row.get('COPYRIGHT_YEAR');
-            var relevancy = row.get('RELEVANCY');
+            var relatedProductRelevancy = row.get('RELATED_PRODUCT_RELEVANCY');
             var role = row.get('ROLE');
             var evolvePrice = row.get('PRICE');
             var ppmPrice = row.get('PPM_PRICE');
@@ -173,8 +173,8 @@
             if (ppmPriceCAD != null) {
                 relatedProductResourceDetails += (parseFloat(ppmPriceCAD) + ";");
             }
-            if (relevancy != null) {
-                relatedProductResourceDetails += (relevancy + ";");
+            if (relatedProductRelevancy != null) {
+                relatedProductResourceDetails += (relatedProductRelevancy + ";");
             }
             if (role != null) {
                 relatedProductResourceDetails += (role);
@@ -293,7 +293,7 @@
                         query="select distinct e.RESOURCE_KEY as RESOURCE_KEY,e.name as NAME, rt.resource_type_key as RESOURCE_TYPE_KEY,
                                pt.product_type_key as PRODUCT_TYPE_KEY,pt.catalog_product_type_key as CATALOG_PRODUCT_TYPE_KEY,
                                bpr.edition_number as EDITION_NUMBER, bpr.copyright_year as COPYRIGHT_YEAR,bpr.ppm_price as PPM_PRICE,
-                               bpr.ppm_price_cad as PPM_PRICE_CAD, bpr.price as PRICE,pt.relevancy as RELEVANCY,er1.role_id as ROLE
+                               bpr.ppm_price_cad as PPM_PRICE_CAD, bpr.price as PRICE,pt.relevancy as RELATED_PRODUCT_RELEVANCY,er1.role_id as ROLE
                                from evladmin.evolve_resource e,evladmin.related_product p ,evladmin.resource_type rt,
                                evladmin.BASE_PRODUCT_RESOURCE bpr, evladmin.product_type pt, evladmin.product_resource pr,
                                evladmin.evolve_resource er1
