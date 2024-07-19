@@ -53,6 +53,10 @@
         <property name="project.workspace" location="."/>
         <property name="env.WORKSPACE" value="${project.workspace}"/>
         <property name="scm.workspace" value="${env.WORKSPACE}"/>
+        <!-- Set SCM INSTALL GROUP -->
+        <property name="project.install.group" value="root"/>
+        <property name="env.INSTALL_GROUP" value="${project.install.group}"/>
+        <property name="scm.install.group" value="${env.INSTALL_GROUP}"/>
         <!-- Set SCM INSTALL USER -->
         <property name="project.install.user" value="siteadm"/>
         <property name="env.INSTALL_USER" value="${project.install.user}"/>
@@ -116,6 +120,7 @@
             <filter token="SCM_PROJECT_NAME" value="${scm.project.name}"/>
             <filter token="SPI_ID" value="${spiId}"/>
             <filter token="INSTALL_ROOT" value="${scm.install.root}"/>
+            <filter token="INSTALL_GROUP" value="${scm.install.group}"/>
             <filter token="INSTALL_USER" value="${scm.install.user}"/>
             <filter token="INSTALL_SYMLINK" value="${scm.install.symlink}"/>
             <filter token="PAYLOAD_BASENAME" value="${scm.payload.basename}"/>
