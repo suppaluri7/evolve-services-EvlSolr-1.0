@@ -161,9 +161,12 @@
             if (catalogProductTypeKey != null) {
                 relatedProductResourceDetails += (catalogProductTypeKey + ";");
             }
+
             if (editionNumber != null) {
-                relatedProductResourceDetails += (editionNumber + ";");
+                relatedProductResourceDetails += editionNumber;
             }
+            relatedProductResourceDetails += ";";
+
             if (copyRightYear != null) {
                 relatedProductResourceDetails += (copyRightYear + ";");
             }
@@ -222,9 +225,12 @@
             if (catalogProductTypeKey != null) {
                 nextEditionDetails += (catalogProductTypeKey + ";");
             }
+
             if (editionNumber != null) {
-                nextEditionDetails += (editionNumber + ";");
+                nextEditionDetails += editionNumber;
             }
+            nextEditionDetails += ";";
+
             if (copyRightYear != null) {
                 nextEditionDetails += (copyRightYear + ";");
             }
