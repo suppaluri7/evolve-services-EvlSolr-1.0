@@ -880,7 +880,7 @@
     <lst name="slave">
       <str name="enable">true</str>
       <!--fully qualified url for the replication handler of master . It is possible to pass on this as a request param for the fetchindex command-->
-      <str name="masterUrl">http://solr-mstr-jetty9prod.ehsevolve.com/solr/evolve/replication</str>
+      <str name="masterUrl">http://solr-mstr.ehsevolve.com/solr/evolve/replication</str>
 
       <!--Interval in which the slave should poll master .Format is HH:mm:ss . If this is absent slave does not poll automatically.
        But a fetchindex can be triggered from the admin or the http API -->
