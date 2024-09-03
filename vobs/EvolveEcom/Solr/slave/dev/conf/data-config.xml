@@ -161,10 +161,12 @@
             if (catalogProductTypeKey != null) {
                 relatedProductResourceDetails += (catalogProductTypeKey + ";");
             }
+
             if (editionNumber != null) {
                 relatedProductResourceDetails += editionNumber;
             }
             relatedProductResourceDetails += ";";
+
             if (copyRightYear != null) {
                 relatedProductResourceDetails += (copyRightYear + ";");
             }
@@ -181,6 +183,14 @@
                 relatedProductResourceDetails += (role);
             }
             row.put('relatedProductDetails', relatedProductResourceDetails);
+            return row;
+        }
+
+		function PopulateNclexFilterInfo(row) {
+            var name = row.get('TITLE');
+            if(name != null && name.toLowerCase().indexOf("nclex") != -1) {
+				row.put('nclexType', row.get('PRODUCT_TYPE_KEY'));
+			}
             return row;
         }
 
@@ -433,6 +443,10 @@
                     <field name="statusStudent" column="PUBLISHED_FLAG"/>
                     <field name="modifiedDateStudent" column="UPDATE_DATE"/>
                     <field name="modifiedByStudent" column="UPDATE_BY"/>
+                </entity>
+                <entity name="nclex_type" transformer="script:PopulateNclexFilterInfo"
+                        query="select product_type_key,'${resource.NAME}' as TITLE,product_type_id from evladmin.product_type where product_type_id='${base_product_resource.PRODUCT_TYPE_ID}'">
+					<field column="nclexType" name="nclexType" />
                 </entity>
             </entity>
         </entity>
