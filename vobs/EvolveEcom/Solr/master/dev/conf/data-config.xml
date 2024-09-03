@@ -185,6 +185,14 @@
             row.put('relatedProductDetails', relatedProductResourceDetails);
             return row;
         }
+		
+		function CheckNclexType(row) {
+            var name = row.get('TITLE');
+            if(name != null && name.toLowerCase().indexOf("nclex") != -1) {
+				row.put('nclexType', row.get('PRODUCT_TYPE_KEY'));
+			}
+            return row;
+        }
 
         function TransformNextEditionDetailsSpec(row) {
             var resourceKey = row.get('RESOURCE_KEY');
@@ -435,6 +443,10 @@
                     <field name="statusStudent" column="PUBLISHED_FLAG"/>
                     <field name="modifiedDateStudent" column="UPDATE_DATE"/>
                     <field name="modifiedByStudent" column="UPDATE_BY"/>
+                </entity>
+                <entity name="nclex_type" transformer="script:CheckNclexType"
+                        query="select product_type_key,'${resource.NAME}' as TITLE,product_type_id from evladmin.product_type where product_type_id='${base_product_resource.PRODUCT_TYPE_ID}'">
+					<field column="nclexType" name="nclexType" />
                 </entity>
             </entity>
         </entity>
