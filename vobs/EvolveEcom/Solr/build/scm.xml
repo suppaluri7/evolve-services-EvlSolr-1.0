@@ -1,17 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project name="scm" basedir="." default="init">
     <description>
-    Shared properties and macros for builds and deploys
+        Shared properties and macros for builds and deploys
     </description>
-    <dirname property="ant.file.scm.dir" file="${ant.file.scm}"/>
-    <dirname property="component.scm" file="${ant.file.scm.dir}"/>
+    <dirname property="component.scm" file="${ant.file.scm}"/>
     <dirname property="VOB" file="${component.scm}"/>
     <dirname property="VOB.root" file="${VOB}"/>
+
     <target name="pre-init" description="May be overridden by initial build script">
-        <property name="project.properties.dir" location="${ant.file.scm.dir}"/>
+        <property name="project.properties.dir" location="${ant.file.scm}"/>
     </target>
+
     <target name="init" depends="pre-init" description="SCM Shared Build and Deploy properties">
-        <property name="scm.xml.version" value="1.0.3.evl"/>
+        <property name="scm.xml.version" value="1.0.3"/>
         <tstamp>
             <format property="scm.timestamp.date_time" pattern="yyyy-MMM-dd HH:mm:ss z"/>
             <format property="scm.timestamp.number" pattern="yyMMddHHmmss"/>
@@ -40,75 +41,18 @@
         <property name="env.PROJECT_NAME" value="${project.name}"/>
         <property name="scm.project.name" value="${env.PROJECT_NAME}"/>
         <!-- Set Deploy Name -->
-        <condition
-            property="project.deploy.name"
-            value="${anthill.build_track.name}"
-            else="${ant.project.name}"
-            >
-            <isset property="anthill.build_track.name"/>
-        </condition>
+        <property name="project.deploy.name" value="${anthill.project.name}"/>
         <property name="app.short.name" value="${project.deploy.name}"/>
         <property name="env.DEPLOY_NAME" value="${app.short.name}"/>
         <property name="scm.deploy.name" value="${env.DEPLOY_NAME}"/>
-        <!-- Set Build Tag -->
-        <condition
-            property="project.build.tag"
-            value="AnthillPro-${anthill.project.name}-${anthill.branch.name}-${anthill.build_track.name}-${scm.build.number}"
-            else="SCM-${user.name}-${scm.project.name}-${scm.version}-${scm.build.number}"
-            >
-            <isset property="anthill.build_track.name"/>
-        </condition>
-        <property name="env.BUILD_TAG" value="${project.build.tag}"/>
-        <property name="scm.build.tag" value="${env.BUILD_TAG}"/>
-        <!-- Set release id -->
+        <!-- Set release id and Build Tag -->
         <property name="scm.release.id" value="${scm.deploy.name}-${scm.version}-${scm.build.number}"/>
         <property name="releaseId" value="${scm.release.id}"/>
+        <property name="scm.project.tag" value="${scm.release.id}"/>
         <!-- Set SCM WORKSPACE -->
-        <condition
-            property="scm.publish.dir"
-            value="${env.WORKSPACE}"
-            >
-            <isset property="env.WORKSPACE"/>
-        </condition>
         <property name="project.workspace" location="."/>
         <property name="env.WORKSPACE" value="${project.workspace}"/>
         <property name="scm.workspace" value="${env.WORKSPACE}"/>
-        <!-- Set SCM REPOSITORY -->
-        <property name="project.repository" location="/cm/DEV"/>
-        <property name="env.SCM_REPOSITORY" location="${project.repository}"/>
-        <property name="scm.repository" value="${env.SCM_REPOSITORY}"/>
-        <!-- Set SCM REMOTEDEPLOY only if env.REMOTE_DEPLOY is true -->
-        <condition property="scm.remotedeploy">
-            <istrue value="${env.REMOTE_DEPLOY}"/>
-        </condition>
-        <!-- Set SCM UCM PROJECT -->
-        <exec
-            executable="/opt/rational/clearcase/bin/cleartool"
-            outputproperty="project.ucm.project"
-            logError="true"
-            osfamily="Unix"
-            >
-                <arg value="lsproject"/>
-                <arg value="-cview"/>
-                <arg value="-fmt"/>
-                <arg value="%Xn"/>
-        </exec>
-        <property name="env.UCM_PROJECT" value="${project.ucm.project}"/>
-        <property name="scm.ucm.project" value="${env.UCM_PROJECT}"/>
-        <!-- Set SCM UCM STREAM -->
-        <exec
-            executable="/opt/rational/clearcase/bin/cleartool"
-            outputproperty="project.ucm.stream"
-            logError="true"
-            osfamily="Unix"
-            >
-                <arg value="lsstream"/>
-                <arg value="-cview"/>
-                <arg value="-fmt"/>
-                <arg value="%Xn"/>
-        </exec>
-        <property name="env.UCM_STREAM" value="${project.ucm.stream}"/>
-        <property name="scm.ucm.stream" value="${env.UCM_STREAM}"/>
         <!-- Set SCM INSTALL GROUP -->
         <property name="project.install.group" value="root"/>
         <property name="env.INSTALL_GROUP" value="${project.install.group}"/>
@@ -133,6 +77,28 @@
         <property name="project.payload.basename" value="${scm.deploy.name}"/>
         <property name="env.PAYLOAD_BASENAME" value="${project.payload.basename}"/>
         <property name="scm.payload.basename" value="${env.PAYLOAD_BASENAME}"/>
+        <!-- Based on Jenkins build vars added additional avavilable properties -->
+        <!-- Set SCM REPOSITORY based on env.GIT_URL or ignore if not set -->
+        <condition property="scm.project.repository" value="${env.GIT_URL}">
+            <isset property="env.GIT_URL"/>
+        </condition>
+        <!-- Set SCM BRANCH based on env.GIT_BRANCH or ignore if not set -->
+        <condition property="scm.project.branch" value="${env.GIT_BRANCH}">
+            <isset property="env.GIT_BRANCH"/>
+        </condition>
+        <!-- Set SCM COMMITHASH based on env.GIT_BRANCH or ignore if not set-->
+        <condition property="scm.project.commithash" value="${env.GIT_COMMIT}">
+            <isset property="env.GIT_COMMIT"/>
+        </condition>
+        <!-- Set BUILDER PROPERTIES -->
+        <!-- Jenkins Job URL -->
+        <condition property="scm.builder.job_url" value="${env.JOB_URL}">
+            <isset property="env.JOB_URL"/>
+        </condition>
+        <!-- Jenkins BUILD URL -->
+        <condition property="scm.builder.build_url" value="${env.BUILD_URL}">
+            <isset property="env.BUILD_URL"/>
+        </condition>
         <!--
         ========================================================
         Commonly used build variables
@@ -162,8 +128,8 @@
         </filterset>
         <property name="stage" location="${VOB}/stage/${scm.deploy.name}"/>
         <property name="stage.file.name" location="${stage}/${deploy.file.name}"/>
-        <property name="scm.properties" location="${scm.workspace}/${ant.project.name}.scm.properties"/>
-        <echoproperties destfile="${scm.properties}" prefix="scm."/>
+        <property name="scm.project.properties" location="${scm.workspace}/${ant.project.name}.scm.properties"/>
+        <echoproperties destfile="${scm.project.properties}" prefix="scm."/>
     </target>
 
     <!--
@@ -172,162 +138,26 @@
     ================================================================
     -->
     <target name="du-build" description="Build Deployment Unit"/>
-    <target name="deployment-unit" depends="du-build, post-build-cp-wrksp-deploy" description="Default build target"/>
+    <target name="deployment-unit" depends="du-build, post-build-cp-wrksp" description="Default build target"/>
 
     <!--
     ================================================================
-    Checkout DU to create a new version of existing file
+    Copy Deployment Unit to scm.workspace (if defined)
     ================================================================
     -->
-    <target name="du-checkout" depends="init" description="UCM-Checkout the deployment unit">
+    <target name="du-copy" depends="init" description="Copy DU to scm.workspace" if="scm.workspace">
         <property name="missing.property" value="ERROR - Missing property"/>
         <fail unless="deploy.unit" message="${missing.property} deploy.unit">
 
-    "deploy.unit" is a required property specifying the location of
-    the file element being check-out, built, and saved. The full file
-    name and directory is expected.
+            "deploy.unit" is a required property specifying the location of
+            the file element being check-out, built, and saved. The full file
+            name and directory is expected.
 
         </fail>
-        <cccheckout viewpath="${deploy.unit}" notco="false" reserved="true" comment="${releaseId}"/>
-    </target>
-
-    <!--
-    ================================================================
-    Save the Deployment Unit Using ClearCase mkelem task
-    Use this target when the deploy.unit has a new name.
-    ================================================================
-    -->
-    <target name="du-save" depends="init" description="SCM - Save deploy.unit as new element">
-        <property name="missing.property" value="ERROR - Missing property"/>
-        <fail unless="deploy.unit" message="${missing.property} deploy.unit">
-
-    "deploy.unit" is a required property specifying the location of
-    the file element being check-out, built, and saved. The full file
-    name and directory is expected.
-
-        </fail>
-        <dirname property="deploy.dir" file="${deploy.unit}"/>
-        <cccheckout viewpath="${deploy.dir}" notco="false" reserved="true" comment="${releaseId}"/>
-        <ccmkelem viewpath="${deploy.unit}" checkin="true" preservetime="true"/>
-        <cccheckin viewpath="${deploy.dir}"/>
-    </target>
-
-    <!--
-    ================================================================
-    Save the Deployment Unit Using ClearCase Checkin task
-    Use with du-checkout to over-write an existing file.
-    ================================================================
-    -->
-    <target name="du-checkin" depends="init" description="SCM - Save deploy.unit as update">
-        <property name="missing.property" value="ERROR - Missing property"/>
-        <fail unless="deploy.unit" message="${missing.property} deploy.unit">
-
-    "deploy.unit" is a required property specifying the location of
-    the file element being check-out, built, and saved. The full file
-    name and directory is expected.
-
-        </fail>
-        <cccheckin viewpath="${deploy.unit}" preservetime="true"/>
-    </target>
-
-    <!--
-    ================================================================
-    Copy Deployment Unit to scm.repository (if defined)
-    ================================================================
-    -->
-    <target name="du-copy" depends="init" description="Copy DU to scm.repository" if="scm.repository">
-        <property name="missing.property" value="ERROR - Missing property"/>
-        <fail unless="deploy.unit" message="${missing.property} deploy.unit">
-
-    "deploy.unit" is a required property specifying the location of
-    the file element being check-out, built, and saved. The full file
-    name and directory is expected.
-
-        </fail>
-        <mkdir dir="${scm.repository}"/>
-        <copy file="${deploy.unit}" todir="${scm.repository}" preservelastmodified="true" verbose="true"/>
+        <mkdir dir="${scm.workspace}"/>
+        <copy file="${deploy.unit}" todir="${scm.workspace}" preservelastmodified="true" verbose="true"/>
         <basename property="deploy.unit.fname" file="${deploy.unit}"/>
-        <chmod file="${scm.repository}/${deploy.unit.fname}" perm="664"/>
-    </target>
-
-    <!--
-    ================================================================
-    Copy Deployment Unit to scm.publish.dir (if defined)
-    ================================================================
-    -->
-    <target name="du-publish" depends="init" description="Copy DU to publishDir" if="scm.publish.dir">
-        <property name="missing.property" value="ERROR - Missing property"/>
-        <fail unless="deploy.unit" message="${missing.property} deploy.unit">
-
-    "deploy.unit" is a required property specifying the location of
-    the file element being check-out, built, and saved. The full file
-    name and directory is expected.
-
-        </fail>
-        <mkdir dir="${scm.publish.dir}"/>
-        <copy file="${deploy.unit}" todir="${scm.publish.dir}" preservelastmodified="true" verbose="true"/>
-        <basename property="deploy.unit.fname" file="${deploy.unit}"/>
-        <chmod file="${scm.publish.dir}/${deploy.unit.fname}" perm="664"/>
-    </target>
-
-    <!--
-    ================================================================
-    Make Deployment Unit available in Integration Stream
-    ================================================================
-    -->
-    <target name="du-deliver" description="UCM-Deliver to Integration Stream">
-        <!-- Fileset is required but the deliver command fails if file   -->
-        <!-- is on the command line. addsourcefile=false prevents this.  -->
-        <exec executable="cleartool" failonerror="true">
-            <arg value="deliver"/>
-            <arg value="-abort"/>
-            <arg value="-force"/>
-        </exec>
-    </target>
-
-    <target name="du-deliver-complete" description="UCM-Deliver DU to Integration Stream">
-        <exec executable="cleartool" failonerror="true">
-            <arg value="deliver"/>
-            <arg value="-complete"/>
-            <arg value="-abort"/>
-            <arg value="-force"/>
-        </exec>
-    </target>
-
-    <target name="du-rebase-complete" description="UCM-Rebase to recommended baselines">
-        <exec executable="cleartool" failonerror="true">
-            <arg value="rebase"/>
-            <arg value="-recommended"/>
-            <arg value="-complete"/>
-            <arg value="-abort"/>
-            <arg value="-force"/>
-        </exec>
-    </target>
-
-    <!--
-    ================================================================
-    Remote Deploy Deployment Unit (if set)
-    ================================================================
-    -->
-    <target name="du-remotedeploy" description="SCM-RemoveDeploy DU" if="scm.remotedeploy">
-        <property name="missing.property" value="ERROR - Missing property"/>
-        <fail unless="deploy.unit" message="${missing.property} deploy.unit">
-
-    "deploy.unit" is a required property specifying the location of
-    the file element being check-out, built, and saved. The full file
-    name and directory is expected.
-
-        </fail>
-        <property name="scm.remotedeploy.env" value="DEV"/>
-        <property name="scm.remotedeploy.quiet" value="-q"/>
-        <property name="deploy.file.ext" value="tar"/>
-        <basename property="releaseId" file="${deploy.unit}" suffix=".${deploy.file.ext}"/>
-        <exec executable="/cm/bin/RemoteDeploy" failonerror="true">
-            <arg value="-e"/>
-            <arg value="${scm.remotedeploy.env}"/>
-            <arg value="${scm.remotedeploy.quiet}"/>
-            <arg value="${releaseId}"/>
-        </exec>
+        <chmod file="${scm.workspace}/${deploy.unit.fname}" perm="664"/>
     </target>
 
     <!--
@@ -335,42 +165,45 @@
     Extract README
     ================================================================
     -->
+
     <target name="du-extractREADME" description="SCM-Extrat DU README" if="scm.workspace">
+        <!-- OLD implementation:  -->
         <property name="missing.property" value="ERROR - Missing property"/>
         <fail unless="deploy.unit" message="${missing.property} deploy.unit">
 
-    "deploy.unit" is a required property specifying the location of
-    the file element being check-out, built, and saved. The full file
-    name and directory is expected.
+            "deploy.unit" is a required property specifying the location of
+            the file element being check-out, built, and saved. The full file
+            name and directory is expected.
 
         </fail>
         <property name="deploy.file.ext" value="tar"/>
-        <basename property="scm.release.id" file="${deploy.unit}" suffix=".${deploy.file.ext}"/>
-        <exec executable="/cm/bin/extractREADME" failonerror="true">
-            <arg value="${scm.release.id}"/>
-            <arg value="${scm.workspace}"/>
+        <basename property="deploy.unit.fname" file="${deploy.unit}"/>
+        <property name="deploy.unit.location" location="${scm.workspace}/${deploy.unit.fname}"/>
+        <!-- Create a temporary directory for processing -->
+        <property name="temp_files" value="${scm.workspace}/temp_files"/>
+        <mkdir dir="${temp_files}"/>
+        <!-- Extract README.txt from the tar file -->
+        <untar src="${deploy.unit.location}" dest="${temp_files}"/>
+        <!-- Convert README.txt from Unix to DOS format -->
+        <exec executable="unix2dos" failonerror="true">
+            <arg value="-437"/>
+            <arg value="-n"/>
+            <arg value="${temp_files}/${scm.release.id}/README.txt"/>
+            <arg value="${scm.workspace}/${scm.release.id}_README.txt"/>
         </exec>
+        <!-- Display the path of the converted file -->
+        <!-- Load and print the content of the converted file -->
+        <loadfile property="convertedFileContent" srcFile="${scm.workspace}/${scm.release.id}_README.txt"/>
+        <echo>${convertedFileContent}</echo>
+        <!-- Clean up the temporary directory -->
+        <delete dir="${temp_files}"/>
     </target>
-
 
     <!--
     ================================================================
     SCM Post Build Convenience Targets
     ================================================================
     -->
-    <target name="post-build" depends="post-build-cp-new" description="SCM - Post build activities"/>
-
-    <target name="post-build-cp" depends="du-copy" description="SCM - Copy to scm.repository"/>
-
-    <target name="post-build-cp-upd" depends="du-copy, du-checkin" description="SCM - Copy and CheckIn DU"/>
-
-    <target name="post-build-cp-new" depends="du-copy, du-save" description="SCM - Copy and MkElem DU"/>
-
-    <target name="post-build-cp-publish" depends="du-copy, du-publish" description="SCM - Copy and Publish"/>
-
-    <target name="post-build-cp-new-publish" depends="du-copy, du-save, du-publish" description="SCM - Copy, MkElem, and Publish"/>
-
-    <target name="post-build-cp-publish-deploy" depends="du-copy, du-publish, du-remotedeploy" description="SCM - Copy Publish, and Deploy"/>
-
-    <target name="post-build-cp-wrksp-deploy" depends="du-copy, du-publish, du-extractREADME, du-remotedeploy" description="SCM - Copy, Set Workspace, and Deploy"/>
+    <target name="post-build-cp" depends="du-copy" description="SCM - Copy to root repository."/>
+    <target name="post-build-cp-wrksp" depends="du-copy, du-extractREADME" description="SCM - Copy, Set Workspace, and Deploy"/>
 </project>
