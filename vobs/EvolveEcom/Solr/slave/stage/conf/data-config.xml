@@ -183,6 +183,16 @@
             row.put('relatedProductDetails', relatedProductResourceDetails);
             return row;
         }
+		
+		function PopulateNclexFilterInfo(row) {
+			var name = row.get('NAME');
+			if (name != null && name.toLowerCase().indexOf("nclex") > -1) {
+				row.put('nclexType', row.get('PRODUCT_TYPE_KEY'));
+			} else {
+				row.put('nclexType', null);
+			}
+            return row;
+        }
 
         function TransformNextEditionDetailsSpec(row) {
             var resourceKey = row.get('RESOURCE_KEY');
@@ -433,6 +443,14 @@
                     <field name="statusStudent" column="PUBLISHED_FLAG"/>
                     <field name="modifiedDateStudent" column="UPDATE_DATE"/>
                     <field name="modifiedByStudent" column="UPDATE_BY"/>
+                </entity>
+                <entity name="nclexTypeData" transformer="script:PopulateNclexFilterInfo"
+                        query="select er.NAME as NAME, pt.product_type_key as PRODUCT_TYPE_KEY
+                           from evladmin.evolve_resource er
+                               join evladmin.BASE_PRODUCT_RESOURCE bpr on er.resource_id=bpr.resource_id
+                               join evladmin.product_type pt on bpr.product_type_id=pt.product_type_id
+                           where er.resource_id = ${resource.RESOURCE_ID} and pt.product_type_id = ${base_product_resource.PRODUCT_TYPE_ID}">
+					<field column="nclexType" name="nclexType" />
                 </entity>
             </entity>
         </entity>
