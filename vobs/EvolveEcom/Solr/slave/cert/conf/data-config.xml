@@ -61,7 +61,7 @@
             if (ppmPriceCAD == null) {
                 ppmPriceCAD = "0.0";
             }
-            if (evolvePrice == null) {
+            if (ppmPrice != null) {
                 evolvePrice = ppmPrice;
             }
             if (evolvePrice == null) {
@@ -138,7 +138,7 @@
             if (ppmPriceCAD == null) {
                 ppmPriceCAD = "0.0";
             }
-            if (evolvePrice == null) {
+             if (ppmPrice != null) {
                 evolvePrice = ppmPrice;
             }
             if (evolvePrice == null) {
@@ -200,7 +200,7 @@
             if (ppmPriceCAD == null) {
                 ppmPriceCAD = "0.0";
             }
-            if (evolvePrice == null) {
+            if (ppmPrice != null) {
                 evolvePrice = ppmPrice;
             }
             if (evolvePrice == null) {
