@@ -89,7 +89,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/solr-8.11.2.tgz
 | `DNF_SSLVERIFY` | `True` | `False` | Allows `dnf` to fetch AL2023 repo metadata through corporate proxy |
 | `CURL_OPTS` | _(empty)_ | `-k` | Bypasses cert verification for Artifactory/Apache HTTPS (not needed when using local HTTP server) |
 | `EVLSOLRMASTER_ARTIFACT_URL` | Artifactory URL (set by CI) | `http://host.docker.internal:8000/EvlSolrMaster-dev.tgz` | |
-| `EVLSOLRSLAVE_ARTIFACT_URL` | Artifactory URL (set by CI) | `http://host.docker.internal:8000/EvlSolrSlave-dev.tgz` | || `NR_ARTIFACT_URL` | Artifactory URL (set by CI) | `http://host.docker.internal:8000/newrelic-java.zip` | New Relic agent zip; fetched via BuildKit secret in CI, stub HTTP server locally |
+| `EVLSOLRSLAVE_ARTIFACT_URL` | Artifactory URL (set by CI) | `http://host.docker.internal:8000/EvlSolrSlave-dev.tgz` | || `NR_ARTIFACT_URL` | Artifactory URL (set by CI) | `http://host.docker.internal:8000/newrelic-java.zip` | New Relic agent zip |
 ### Build commands (from build context root)
 
 ```bash
@@ -97,8 +97,6 @@ cd /Users/uppaluris/tio_hcm-evolve-terraformcontrol/evolve-services-EvlSolr-1.0-
 
 # Master
 docker build --no-cache -f master/Dockerfile \
-  --secret id=artifactory_user,src=/tmp/secrets/artifactory_user \
-  --secret id=artifactory_token,src=/tmp/secrets/artifactory_token \
   --build-arg DNF_SSLVERIFY=False \
   --build-arg SOLR_DOWNLOAD_URL="http://host.docker.internal:8000/solr-8.11.2.tgz" \
   --build-arg EVLSOLRMASTER_ARTIFACT_URL="http://host.docker.internal:8000/EvlSolrMaster-dev.tgz" \
@@ -107,8 +105,6 @@ docker build --no-cache -f master/Dockerfile \
 
 # Slave
 docker build --no-cache -f slave/Dockerfile \
-  --secret id=artifactory_user,src=/tmp/secrets/artifactory_user \
-  --secret id=artifactory_token,src=/tmp/secrets/artifactory_token \
   --build-arg DNF_SSLVERIFY=False \
   --build-arg SOLR_DOWNLOAD_URL="http://host.docker.internal:8000/solr-8.11.2.tgz" \
   --build-arg EVLSOLRSLAVE_ARTIFACT_URL="http://host.docker.internal:8000/EvlSolrSlave-dev.tgz" \

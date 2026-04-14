@@ -1,17 +1,12 @@
-# syntax=docker/dockerfile:1.4
 # EvlSolrMaster — Container Image  (NHETIO-4421)
 # Replaces: packer/solr.pkr.hcl + install_latest_solr.sh + userdata_solr.tpl
 #
 # CI must stage into build context root before docker build:
 #   tio-utils.sh      ← repo root
 #
-# Required build secrets (--secret id=...,src=<file>):
-#   artifactory_user   file containing Artifactory username
-#   artifactory_token  file containing Artifactory API token
-#
 # Required build args (--build-arg):
 #   EVLSOLRMASTER_ARTIFACT_URL  Artifactory URL for EvlSolrMaster-<version>.tgz
-#   NR_ARTIFACT_URL             URL for newrelic-java.zip (Artifactory or public download)
+#   NR_ARTIFACT_URL             URL for newrelic-java.zip
 #
 # Core Engineering hardened AL2023 Java 8 image (account 702267635140) — replaces public amazoncorretto upstream
 FROM docker-eols-cijenkins-local.health.artifactory.tio.systems/eols/tio-al2023-java8:1.0.0
@@ -30,7 +25,6 @@ ARG CURL_OPTS=""
 ARG DNF_SSLVERIFY=True
 
 # Artifactory artifact URLs — passed via --build-arg in CI
-# Credentials are never embedded in layers; they are read from BuildKit secrets at fetch time.
 ARG EVLSOLRMASTER_ARTIFACT_URL
 ARG NR_ARTIFACT_URL
 
@@ -84,13 +78,7 @@ COPY tio-utils.sh /opt/tio/
 # Built by vobs/EvolveEcom/Solr/master/build/build.xml
 # TGZ structure: flat core overlay (conf/, data/, META-INF/) per project.properties install.root=/var/solr/data/evolve
 # EC2 extracts to /var/solr/data/evolve (SOLR_HOME=/var/solr/data); container extracts to SOLR_HOME/evolve below.
-# Credentials are mounted read-only from BuildKit secrets and never written to any layer.
-RUN --mount=type=secret,id=artifactory_user \
-    --mount=type=secret,id=artifactory_token \
-    AUSER=$(cat /run/secrets/artifactory_user) \
-    ATOKEN=$(cat /run/secrets/artifactory_token) \
-    curl ${CURL_OPTS} -fSL \
-      -u "${AUSER}:${ATOKEN}" \
+RUN curl ${CURL_OPTS} -fSL \
       "${EVLSOLRMASTER_ARTIFACT_URL}" \
       -o /opt/tio/EvlSolrMaster.tgz \
     && mkdir -p /opt/solr/current/server/solr/evolve \
@@ -113,14 +101,9 @@ RUN cp /opt/solr/current/server/resources/log4j2.xml /var/solr/ \
          'RUNAS="evolve"' \
        > /etc/default/solr.in.sh
 
-# 8. New Relic agent — fetched from Artifactory via BuildKit secret.
+# 8. New Relic agent — fetched at build time via NR_ARTIFACT_URL build arg.
 # License key is NOT baked in; it is injected at runtime by docker-entrypoint.sh.
-RUN --mount=type=secret,id=artifactory_user \
-    --mount=type=secret,id=artifactory_token \
-    AUSER=$(cat /run/secrets/artifactory_user) \
-    ATOKEN=$(cat /run/secrets/artifactory_token) \
-    curl ${CURL_OPTS} -fSL \
-      -u "${AUSER}:${ATOKEN}" \
+RUN curl ${CURL_OPTS} -fSL \
       "${NR_ARTIFACT_URL}" \
       -o /opt/newrelic/newrelic-java.zip \
     && unzip -q /opt/newrelic/newrelic-java.zip -d /opt/newrelic/ \
