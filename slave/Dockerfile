@@ -88,6 +88,7 @@ RUN curl ${CURL_OPTS} -fSL \
          -C /opt/solr/current/server/solr/evolve/ \
     && rm /opt/tio/EvlSolrSlave.tgz
 
+# core.properties triggers auto-discovery — replaces: bin/solr create at runtime
 RUN echo "name=evolve" > /opt/solr/current/server/solr/evolve/core.properties
 
 # 7. solr.in.sh — replaces: install_solr_service.sh (skipped; registers init.d/systemd)
