@@ -74,7 +74,9 @@ RUN unzip -q /opt/tio/evolve-solr-config.zip -d /opt/solr/ \
     && rm -rf /opt/tio/evolve-solr-config.zip /opt/solr/evolve-solr-config
 
 # 4b. Oracle JDBC driver — replaces: ojdbc6.jar baked into EC2 AMI via Packer (NHETIO-3792)
-# Destination confirmed from running container: server/lib/ext/ is Jetty's ext classloader path
+# NOTE: ojdbc6.jar is the current file in the repo. Upgrade to ojdbc8.jar (Oracle 19c / Java 8)
+# is tracked in NHETIO-3792. Update this COPY path when ojdbc8.jar is committed.
+# Destination: server/lib/ext/ is Jetty's ext classloader path for JNDI DataSource
 COPY vobs/EvolveEcom/Solr/setup/ojdbc6.jar /opt/solr/current/server/lib/ext/
 
 # 5. tio-utils.sh — mirrors: packer/solr.pkr.hcl "Copy TIO assets" (CI-staged)

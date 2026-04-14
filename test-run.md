@@ -20,22 +20,26 @@ repeatable from a clean state.
 ## One-time setup — host assets
 
 These files must exist on the Mac before any `docker build`. They are
-not committed to the repo (sizes: 35 MB and 189 KB respectively).
+not committed to the repo.
 
 ```bash
 # 1. Stage CI assets into the build context root
 cd /Users/uppaluris/tio_hcm-evolve-terraformcontrol/evolve-services-EvlSolr-1.0-master
 cp ../tio-utils.sh .
-cp ../packer/assets/3rdparty/newrelic/newrelic-java.zip .
+# Note: newrelic-java.zip is NO LONGER staged in the build context root.
+# It is now fetched from Artifactory at build time via BuildKit secrets.
+# For local builds, serve it from the stub HTTP server (see step 2 below).
 
-# 2. Pre-download Solr 8.11.2 to /tmp/stubs (served via HTTP to the container)
-#    Required because the AL2023 repo SSL cert cannot be verified through the
-#    corporate proxy inside the container build context.
+# 2. Pre-download Solr 8.11.2 and stub artifacts to /tmp/stubs (served via HTTP)
+#    Also copy newrelic-java.zip to /tmp/stubs for local builds.
 mkdir -p /tmp/stubs
 curl -k -fSL https://archive.apache.org/dist/lucene/solr/8.11.2/solr-8.11.2.tgz \
      -o /tmp/stubs/solr-8.11.2.tgz
 # Verify the tarball is intact
 tar -tzf /tmp/stubs/solr-8.11.2.tgz | head -3
+
+# Copy newrelic-java.zip to stubs directory (served as NR_ARTIFACT_URL locally)
+cp ../packer/assets/3rdparty/newrelic/newrelic-java.zip /tmp/stubs/
 
 # 3. Build stub artifacts that contain a real solrconfig.xml
 #    (Real CI uses an Artifactory artifact — stub simulates the conf/ skeleton)
@@ -48,6 +52,12 @@ tar -xzf /tmp/stubs/solr-8.11.2.tgz \
 ls /tmp/stubs_conf/conf/
 tar czf /tmp/stubs/EvlSolrMaster-dev.tgz -C /tmp/stubs_conf conf
 tar czf /tmp/stubs/EvlSolrSlave-dev.tgz  -C /tmp/stubs_conf conf
+
+# 4. Create stub BuildKit secret files (no-auth local HTTP server needs no real creds)
+mkdir -p /tmp/secrets
+echo "local" > /tmp/secrets/artifactory_user
+echo "local" > /tmp/secrets/artifactory_token
+chmod 600 /tmp/secrets/artifactory_user /tmp/secrets/artifactory_token
 ```
 
 ---
@@ -79,8 +89,7 @@ curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/solr-8.11.2.tgz
 | `DNF_SSLVERIFY` | `True` | `False` | Allows `dnf` to fetch AL2023 repo metadata through corporate proxy |
 | `CURL_OPTS` | _(empty)_ | `-k` | Bypasses cert verification for Artifactory/Apache HTTPS (not needed when using local HTTP server) |
 | `EVLSOLRMASTER_ARTIFACT_URL` | Artifactory URL (set by CI) | `http://host.docker.internal:8000/EvlSolrMaster-dev.tgz` | |
-| `EVLSOLRSLAVE_ARTIFACT_URL` | Artifactory URL (set by CI) | `http://host.docker.internal:8000/EvlSolrSlave-dev.tgz` | |
-
+| `EVLSOLRSLAVE_ARTIFACT_URL` | Artifactory URL (set by CI) | `http://host.docker.internal:8000/EvlSolrSlave-dev.tgz` | || `NR_ARTIFACT_URL` | Artifactory URL (set by CI) | `http://host.docker.internal:8000/newrelic-java.zip` | New Relic agent zip; fetched via BuildKit secret in CI, stub HTTP server locally |
 ### Build commands (from build context root)
 
 ```bash
@@ -88,16 +97,22 @@ cd /Users/uppaluris/tio_hcm-evolve-terraformcontrol/evolve-services-EvlSolr-1.0-
 
 # Master
 docker build --no-cache -f master/Dockerfile \
+  --secret id=artifactory_user,src=/tmp/secrets/artifactory_user \
+  --secret id=artifactory_token,src=/tmp/secrets/artifactory_token \
   --build-arg DNF_SSLVERIFY=False \
   --build-arg SOLR_DOWNLOAD_URL="http://host.docker.internal:8000/solr-8.11.2.tgz" \
   --build-arg EVLSOLRMASTER_ARTIFACT_URL="http://host.docker.internal:8000/EvlSolrMaster-dev.tgz" \
+  --build-arg NR_ARTIFACT_URL="http://host.docker.internal:8000/newrelic-java.zip" \
   -t evlsolrmaster:local .
 
 # Slave
 docker build --no-cache -f slave/Dockerfile \
+  --secret id=artifactory_user,src=/tmp/secrets/artifactory_user \
+  --secret id=artifactory_token,src=/tmp/secrets/artifactory_token \
   --build-arg DNF_SSLVERIFY=False \
   --build-arg SOLR_DOWNLOAD_URL="http://host.docker.internal:8000/solr-8.11.2.tgz" \
   --build-arg EVLSOLRSLAVE_ARTIFACT_URL="http://host.docker.internal:8000/EvlSolrSlave-dev.tgz" \
+  --build-arg NR_ARTIFACT_URL="http://host.docker.internal:8000/newrelic-java.zip" \
   -t evlsolrslave:local .
 ```
 
