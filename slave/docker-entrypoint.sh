@@ -31,12 +31,25 @@ EVOLVE_JDBC_STRING="jdbc:oracle:thin:@//${EVOLVE_JDBC_HOST}:${EVOLVE_JDBC_PORT}/
 sed -i "s|EVOLVE_DB_URL|${EVOLVE_JDBC_STRING}|g"        "${SOLR_DB_CONFIG_JNDI}"
 sed -i "s|EVOLVE_DB_USERNAME|${EVOLVE_JDBC_USERNAME}|g"  "${SOLR_DB_CONFIG_JNDI}"
 sed -i "s|EVOLVE_DB_PASSWORD|${EVOLVE_JDBC_PASSWORD}|g"  "${SOLR_DB_CONFIG_JNDI}"
+# Scrub: prevent credentials from residing in shell memory beyond this point
+unset DB_CREDS EVOLVE_JDBC_HOST EVOLVE_JDBC_PORT EVOLVE_JDBC_DBNAME \
+      EVOLVE_JDBC_USERNAME EVOLVE_JDBC_PASSWORD EVOLVE_JDBC_STRING
 echo "[entrypoint] DB credentials injected."
 
 # 1b. masterUrl patch (Slave only) — replaces: hardcoded EC2 DNS in EvlSolrSlave artifact's solrconfig.xml
 # Falls back to baked-in EC2 DNS when SOLR_MASTER_URL is unset (migration compatibility)
 DEFAULT_MASTER_URL="http://solr-mstr-${EVOLVE_INSTANCE_ENV}.ehsevolve.com/solr/evolve/replication"
 EFFECTIVE_MASTER_URL="${SOLR_MASTER_URL:-${DEFAULT_MASTER_URL}}"
+
+# Validate before injecting into XML to prevent XML injection / sed delimiter collision
+if [[ ! "${EFFECTIVE_MASTER_URL}" =~ ^https?:// ]]; then
+  echo "[entrypoint] ERROR: SOLR_MASTER_URL must start with http:// or https://" >&2
+  exit 1
+fi
+if [[ "${EFFECTIVE_MASTER_URL}" =~ [\'\"<>&|] ]]; then
+  echo "[entrypoint] ERROR: SOLR_MASTER_URL contains characters invalid in XML/sed context" >&2
+  exit 1
+fi
 
 sed -i \
   "s|<str name=\"masterUrl\">.*</str>|<str name=\"masterUrl\">${EFFECTIVE_MASTER_URL}</str>|" \
@@ -62,6 +75,7 @@ if [[ -f "${NR_YML}" ]]; then
     --output text | jq -r '.LicenseKey')
 
   sed -i "s/^\(.*license_key:\).*$/\1 '${NR_LICENSE_KEY}'/" "${NR_YML}"
+  unset NR_LICENSE_KEY
   echo "[entrypoint] New Relic license key injected."
 
   # 4. NR app name (Slave) — replaces: NR_INSTANCE_ID in install_newrelic.sh

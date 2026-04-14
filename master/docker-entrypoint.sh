@@ -29,6 +29,9 @@ EVOLVE_JDBC_STRING="jdbc:oracle:thin:@//${EVOLVE_JDBC_HOST}:${EVOLVE_JDBC_PORT}/
 sed -i "s|EVOLVE_DB_URL|${EVOLVE_JDBC_STRING}|g"        "${SOLR_DB_CONFIG_JNDI}"
 sed -i "s|EVOLVE_DB_USERNAME|${EVOLVE_JDBC_USERNAME}|g"  "${SOLR_DB_CONFIG_JNDI}"
 sed -i "s|EVOLVE_DB_PASSWORD|${EVOLVE_JDBC_PASSWORD}|g"  "${SOLR_DB_CONFIG_JNDI}"
+# Scrub: prevent credentials from residing in shell memory beyond this point
+unset DB_CREDS EVOLVE_JDBC_HOST EVOLVE_JDBC_PORT EVOLVE_JDBC_DBNAME \
+      EVOLVE_JDBC_USERNAME EVOLVE_JDBC_PASSWORD EVOLVE_JDBC_STRING
 echo "[entrypoint] DB credentials injected."
 
 # 2. Java heap — replaces: SOLR_JAVA_HEAP_OVERRIDE in userdata_solr.tpl
@@ -50,6 +53,7 @@ if [[ -f "${NR_YML}" ]]; then
     --output text | jq -r '.LicenseKey')
 
   sed -i "s/^\(.*license_key:\).*$/\1 '${NR_LICENSE_KEY}'/" "${NR_YML}"
+  unset NR_LICENSE_KEY
   echo "[entrypoint] New Relic license key injected."
 
   # 4. NR app name — replaces: NR_INSTANCE_ID in install_newrelic.sh
