@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="EvlSolrSlave" default="tar">
+    <dirname property="ant.file.EvlSolrSlave.dir" file="${ant.file.EvlSolrSlave}"/>
+    <dirname property="component" file="${ant.file.EvlSolrSlave.dir}"/>
+    <dirname property="ucm_component" file="${component}"/>
+    <dirname property="VOB" file="${component}"/>
+    <dirname property="VOB.root" file="${VOB}"/>
+    <property name="build.common" location="${ucm_component}/build"/>
+    <property name="common.xml" location="${build.common}/common.xml"/>
+    <import file="${common.xml}"/>
+
+    <target name="pre-init" description="EvlSolrSlave pre-initialization.">
+        <!--<property name="build.dir" location="${ant.file.EvlSolrSlave.dir}"/> -->
+        <property name="build.dir" location="${build.common}"/>
+        <property name="project.properties.dir" location="${build.common}"/>
+        <property name="solr.control" location="slave"/>
+    </target>
+
+    <target depends="init" name="tgz" description="Create compressed tar file">
+        <project-tgz src="${component}/dev" tgz="${component}/dev/${scm.deploy.name}.tgz"/>
+        <project-tgz src="${component}/cert" tgz="${component}/cert/${scm.deploy.name}.tgz"/>
+        <project-tgz src="${component}/stage" tgz="${component}/stage/${scm.deploy.name}.tgz"/>
+        <project-tgz src="${component}/prod" tgz="${component}/prod/${scm.deploy.name}.tgz"/>
+        <project-tgz/>
+        <delete file="${component}/dev/${scm.deploy.name}.tgz"/>
+        <delete file="${component}/cert/${scm.deploy.name}.tgz"/>
+        <delete file="${component}/stage/${scm.deploy.name}.tgz"/>
+        <delete file="${component}/prod/${scm.deploy.name}.tgz"/>
+    </target>
+
+    <target depends="tgz" name="tar" description="Create Deployment Unit">
+        <release-tar />
+    </target>
+
+</project>

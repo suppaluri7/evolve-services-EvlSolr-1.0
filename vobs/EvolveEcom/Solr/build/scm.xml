@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="scm" basedir="." default="init">
+    <description>
+        Shared properties and macros for builds and deploys
+    </description>
+    <dirname property="component.scm" file="${ant.file.scm}"/>
+    <dirname property="VOB" file="${component.scm}"/>
+    <dirname property="VOB.root" file="${VOB}"/>
+
+    <target name="pre-init" description="May be overridden by initial build script">
+        <property name="project.properties.dir" location="${ant.file.scm}"/>
+    </target>
+
+    <target name="init" depends="pre-init" description="SCM Shared Build and Deploy properties">
+        <property name="scm.xml.version" value="1.0.3"/>
+        <tstamp>
+            <format property="scm.timestamp.date_time" pattern="yyyy-MMM-dd HH:mm:ss z"/>
+            <format property="scm.timestamp.number" pattern="yyMMddHHmmss"/>
+        </tstamp>
+        <property environment="env"/>
+        <property name="project.properties" location="${project.properties.dir}/project.properties"/>
+        <property file="${project.properties}" prefix="project"/>
+        <!-- Set Version Number -->
+        <property name="anthill.version" value="${user.name}"/>
+        <property name="project.version" value="${anthill.version}"/>
+        <property name="env.PROJECT_VERSION" value="${project.version}"/>
+        <property name="scm.version" value="${env.PROJECT_VERSION}"/>
+        <!-- Set Build Number -->
+        <property name="anthill.buildNumber" value="${scm.timestamp.number}"/>
+        <property name="project.build.number" value="${anthill.buildNumber}"/>
+        <property name="env.BUILD_NUMBER" value="${project.build.number}"/>
+        <property name="scm.build.number" value="${env.BUILD_NUMBER}"/>
+        <!-- Set Build Date Time -->
+        <property name="anthill.build.date_time" value="${scm.timestamp.date_time}"/>
+        <property name="project.build.date_time" value="${anthill.build.date_time}"/>
+        <property name="env.BUILD_DATE_TIME" value="${project.build.date_time}"/>
+        <property name="scm.build.date_time" value="${env.BUILD_DATE_TIME}"/>
+        <!-- Set Project Name -->
+        <property name="anthill.project.name" value="${ant.project.name}"/>
+        <property name="project.name" value="${anthill.project.name}"/>
+        <property name="env.PROJECT_NAME" value="${project.name}"/>
+        <property name="scm.project.name" value="${env.PROJECT_NAME}"/>
+        <!-- Set Deploy Name -->
+        <property name="project.deploy.name" value="${anthill.project.name}"/>
+        <property name="app.short.name" value="${project.deploy.name}"/>
+        <property name="env.DEPLOY_NAME" value="${app.short.name}"/>
+        <property name="scm.deploy.name" value="${env.DEPLOY_NAME}"/>
+        <!-- Set release id and Build Tag -->
+        <property name="scm.release.id" value="${scm.deploy.name}-${scm.version}-${scm.build.number}"/>
+        <property name="releaseId" value="${scm.release.id}"/>
+        <property name="scm.project.tag" value="${scm.release.id}"/>
+        <!-- Set SCM WORKSPACE -->
+        <property name="project.workspace" location="."/>
+        <property name="env.WORKSPACE" value="${project.workspace}"/>
+        <property name="scm.workspace" value="${env.WORKSPACE}"/>
+        <!-- Set SCM INSTALL GROUP -->
+        <property name="project.install.group" value="root"/>
+        <property name="env.INSTALL_GROUP" value="${project.install.group}"/>
+        <property name="scm.install.group" value="${env.INSTALL_GROUP}"/>
+        <!-- Set SCM INSTALL USER -->
+        <property name="project.install.user" value="siteadm"/>
+        <property name="env.INSTALL_USER" value="${project.install.user}"/>
+        <property name="scm.install.user" value="${env.INSTALL_USER}"/>
+        <!-- Set SCM INSTALL ROOT -->
+        <property name="project.install.root" value="/export/home/${scm.install.user}"/>
+        <property name="env.INSTALL_ROOT" value="${project.install.root}"/>
+        <property name="scm.install.root" value="${env.INSTALL_ROOT}"/>
+        <!-- Set SCM INSTALL SYMLINK -->
+        <property name="project.install.symlink" value="${scm.deploy.name}"/>
+        <property name="env.INSTALL_SYMLINK" value="${project.install.symlink}"/>
+        <property name="scm.install.symlink" value="${env.INSTALL_SYMLINK}"/>
+        <!-- Set SCM PAYLOAD PKGTYPE -->
+        <property name="project.payload.pkgtype" value="war"/>
+        <property name="env.PAYLOAD_PKGTYPE" value="${project.payload.pkgtype}"/>
+        <property name="scm.payload.pkgtype" value="${env.PAYLOAD_PKGTYPE}"/>
+        <!-- Set SCM PAYLOAD BASENAME -->
+        <property name="project.payload.basename" value="${scm.deploy.name}"/>
+        <property name="env.PAYLOAD_BASENAME" value="${project.payload.basename}"/>
+        <property name="scm.payload.basename" value="${env.PAYLOAD_BASENAME}"/>
+        <!-- Based on Jenkins build vars added additional avavilable properties -->
+        <!-- Set SCM REPOSITORY based on env.GIT_URL or ignore if not set -->
+        <condition property="scm.project.repository" value="${env.GIT_URL}">
+            <isset property="env.GIT_URL"/>
+        </condition>
+        <!-- Set SCM BRANCH based on env.GIT_BRANCH or ignore if not set -->
+        <condition property="scm.project.branch" value="${env.GIT_BRANCH}">
+            <isset property="env.GIT_BRANCH"/>
+        </condition>
+        <!-- Set SCM COMMITHASH based on env.GIT_BRANCH or ignore if not set-->
+        <condition property="scm.project.commithash" value="${env.GIT_COMMIT}">
+            <isset property="env.GIT_COMMIT"/>
+        </condition>
+        <!-- Set BUILDER PROPERTIES -->
+        <!-- Jenkins Job URL -->
+        <condition property="scm.builder.job_url" value="${env.JOB_URL}">
+            <isset property="env.JOB_URL"/>
+        </condition>
+        <!-- Jenkins BUILD URL -->
+        <condition property="scm.builder.build_url" value="${env.BUILD_URL}">
+            <isset property="env.BUILD_URL"/>
+        </condition>
+        <!--
+        ========================================================
+        Commonly used build variables
+        ========================================================
+        -->
+        <property name="build.dir" location="build"/>
+        <property name="release.dir" location="${build.dir}/releases"/>
+        <property name="include.dir" location="${build.dir}/include"/>
+        <property name="deploy.file.ext" value="tar"/>
+        <property name="deploy.file.name" value="${scm.release.id}.${deploy.file.ext}"/>
+        <property name="deploy.unit" location="${release.dir}/${deploy.file.name}"/>
+        <filterset id="ReleaseIdFilterSet">
+            <filter token="RELEASE_ID" value="${releaseId}"/>
+            <filter token="TAR_FILENAME" value="${deploy.file.name}"/>
+            <filter token="DEPLOY_NAME" value="${deploy.file.name}"/>
+            <filter token="BUILD_DATE_TIME" value="${scm.build.date_time}"/>
+            <filter token="BUILD_USER_NAME" value="${user.name}"/>
+            <filter token="APP_SHORT_NAME" value="${app.short.name}"/>
+            <filter token="SCM_PROJECT_NAME" value="${scm.project.name}"/>
+            <filter token="SPI_ID" value="${spiId}"/>
+            <filter token="INSTALL_ROOT" value="${scm.install.root}"/>
+            <filter token="INSTALL_GROUP" value="${scm.install.group}"/>
+            <filter token="INSTALL_USER" value="${scm.install.user}"/>
+            <filter token="INSTALL_SYMLINK" value="${scm.install.symlink}"/>
+            <filter token="PAYLOAD_BASENAME" value="${scm.payload.basename}"/>
+            <filter token="PAYLOAD_PKGTYPE" value="${scm.payload.pkgtype}"/>
+        </filterset>
+        <property name="stage" location="${VOB}/stage/${scm.deploy.name}"/>
+        <property name="stage.file.name" location="${stage}/${deploy.file.name}"/>
+        <property name="scm.project.properties" location="${scm.workspace}/${ant.project.name}.scm.properties"/>
+        <echoproperties destfile="${scm.project.properties}" prefix="scm."/>
+    </target>
+
+    <!--
+    ================================================================
+    SCM targets for building the Deployment Unit
+    ================================================================
+    -->
+    <target name="du-build" description="Build Deployment Unit"/>
+    <target name="deployment-unit" depends="du-build, post-build-cp-wrksp" description="Default build target"/>
+
+    <!--
+    ================================================================
+    Copy Deployment Unit to scm.workspace (if defined)
+    ================================================================
+    -->
+    <target name="du-copy" depends="init" description="Copy DU to scm.workspace" if="scm.workspace">
+        <property name="missing.property" value="ERROR - Missing property"/>
+        <fail unless="deploy.unit" message="${missing.property} deploy.unit">
+
+            "deploy.unit" is a required property specifying the location of
+            the file element being check-out, built, and saved. The full file
+            name and directory is expected.
+
+        </fail>
+        <mkdir dir="${scm.workspace}"/>
+        <copy file="${deploy.unit}" todir="${scm.workspace}" preservelastmodified="true" verbose="true"/>
+        <basename property="deploy.unit.fname" file="${deploy.unit}"/>
+        <chmod file="${scm.workspace}/${deploy.unit.fname}" perm="664"/>
+    </target>
+
+    <!--
+    ================================================================
+    Extract README
+    ================================================================
+    -->
+
+    <target name="du-extractREADME" description="SCM-Extrat DU README" if="scm.workspace">
+        <!-- OLD implementation:  -->
+        <property name="missing.property" value="ERROR - Missing property"/>
+        <fail unless="deploy.unit" message="${missing.property} deploy.unit">
+
+            "deploy.unit" is a required property specifying the location of
+            the file element being check-out, built, and saved. The full file
+            name and directory is expected.
+
+        </fail>
+        <property name="deploy.file.ext" value="tar"/>
+        <basename property="deploy.unit.fname" file="${deploy.unit}"/>
+        <property name="deploy.unit.location" location="${scm.workspace}/${deploy.unit.fname}"/>
+        <!-- Create a temporary directory for processing -->
+        <property name="temp_files" value="${scm.workspace}/temp_files"/>
+        <mkdir dir="${temp_files}"/>
+        <!-- Extract README.txt from the tar file -->
+        <untar src="${deploy.unit.location}" dest="${temp_files}"/>
+        <!-- Convert README.txt from Unix to DOS format -->
+        <exec executable="unix2dos" failonerror="true">
+            <arg value="-437"/>
+            <arg value="-n"/>
+            <arg value="${temp_files}/${scm.release.id}/README.txt"/>
+            <arg value="${scm.workspace}/${scm.release.id}_README.txt"/>
+        </exec>
+        <!-- Display the path of the converted file -->
+        <!-- Load and print the content of the converted file -->
+        <loadfile property="convertedFileContent" srcFile="${scm.workspace}/${scm.release.id}_README.txt"/>
+        <echo>${convertedFileContent}</echo>
+        <!-- Clean up the temporary directory -->
+        <delete dir="${temp_files}"/>
+    </target>
+
+    <!--
+    ================================================================
+    SCM Post Build Convenience Targets
+    ================================================================
+    -->
+    <target name="post-build-cp" depends="du-copy" description="SCM - Copy to root repository."/>
+    <target name="post-build-cp-wrksp" depends="du-copy, du-extractREADME" description="SCM - Copy, Set Workspace, and Deploy"/>
+</project>

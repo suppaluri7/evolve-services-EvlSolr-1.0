@@ -1,0 +1,101 @@
+# EvlSolrMaster — Container Image  (NHETIO-4421)
+# Replaces: packer/solr.pkr.hcl + install_latest_solr.sh + userdata_solr.tpl
+#
+# CI must stage into build context root before docker build:
+#   tio-utils.sh      ← repo root
+#   newrelic-java.zip ← packer/assets/3rdparty/newrelic/newrelic-java.zip
+#
+# Core Engineering hardened AL2023 Java 8 image (account 702267635140) — replaces public amazoncorretto upstream
+FROM docker-eols-cijenkins-local.health.artifactory.tio.systems/eols/tio-al2023-java8:1.0.0
+
+ARG SOLR_VERSION=8.11.2
+# Local dev overrides (leave unset in CI/prod)
+ARG SOLR_DOWNLOAD_URL="https://archive.apache.org/dist/lucene/solr/${SOLR_VERSION}/solr-${SOLR_VERSION}.tgz"
+ARG CURL_OPTS=""
+ARG DNF_SSLVERIFY=True
+
+# 1. Runtime packages — mirrors: packer/solr.pkr.hcl dnf install step
+RUN echo "sslverify=${DNF_SSLVERIFY}" >> /etc/dnf/dnf.conf \
+    && dnf install -y --allowerasing \
+      tar \
+      gzip \
+      unzip \
+      jq \
+      awscli \
+      shadow-utils \
+      procps-ng \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+# 2. Directories + OS user — mirrors: packer/solr.pkr.hcl "Create Destination Folders"
+RUN mkdir -p \
+      /opt/tio \
+      /opt/newrelic \
+      /opt/solr \
+      /var/solr/logs \
+    && useradd -r -m -s /sbin/nologin evolve
+
+# 3. Download Solr — mirrors: packer/solr.pkr.hcl "Download & Unpack Solr"
+RUN curl ${CURL_OPTS} -fSL \
+      "${SOLR_DOWNLOAD_URL}" \
+      -o /opt/tio/solr-${SOLR_VERSION}.tgz \
+    && tar -xzf /opt/tio/solr-${SOLR_VERSION}.tgz -C /opt/solr/ \
+    && ln -s /opt/solr/solr-${SOLR_VERSION} /opt/solr/current \
+    && mkdir -p /opt/solr/current/logs \
+    && rm /opt/tio/solr-${SOLR_VERSION}.tgz
+
+# 4. Solr config overlay — mirrors: packer/solr.pkr.hcl "Unpack Solr Config"
+# Provides: evolve-jetty-jndi.xml, Jetty Plus/JNDI jars, ojdbc6.jar (NHETIO-3792), plus.mod, lang files
+COPY vobs/EvolveEcom/Solr/setup/evolve-solr-config.zip /opt/tio/
+RUN unzip -q /opt/tio/evolve-solr-config.zip -d /opt/solr/ \
+    && cp -rf /opt/solr/evolve-solr-config/server /opt/solr/current/ \
+    && rm -rf /opt/tio/evolve-solr-config.zip /opt/solr/evolve-solr-config
+
+# 4b. Oracle JDBC driver — replaces: ojdbc6.jar baked into EC2 AMI via Packer (NHETIO-3792)
+# Destination confirmed from running container: server/lib/ext/ is Jetty's ext classloader path
+COPY vobs/EvolveEcom/Solr/setup/ojdbc6.jar /opt/solr/current/server/lib/ext/
+
+# 5. tio-utils.sh — mirrors: packer/solr.pkr.hcl "Copy TIO assets" (CI-staged)
+COPY tio-utils.sh /opt/tio/
+
+# 6. EvlSolrMaster artifact — replaces: rt_install_evl_packages in install_latest_solr.sh
+# Built by vobs/EvolveEcom/Solr/master/build/build.xml
+# TGZ structure: flat core overlay (conf/, data/, META-INF/) per project.properties install.root=/var/solr/data/evolve
+# EC2 extracts to /var/solr/data/evolve (SOLR_HOME=/var/solr/data); container extracts to SOLR_HOME/evolve below.
+ARG EVLSOLRMASTER_ARTIFACT_URL
+RUN curl ${CURL_OPTS} -fSL "${EVLSOLRMASTER_ARTIFACT_URL}" -o /opt/tio/EvlSolrMaster.tgz \
+    && mkdir -p /opt/solr/current/server/solr/evolve \
+    && tar -xzf /opt/tio/EvlSolrMaster.tgz \
+         -C /opt/solr/current/server/solr/evolve/ \
+    && rm /opt/tio/EvlSolrMaster.tgz
+
+# core.properties triggers auto-discovery — replaces: bin/solr create at runtime
+RUN echo "name=evolve" > /opt/solr/current/server/solr/evolve/core.properties
+
+# 7. solr.in.sh — replaces: install_solr_service.sh (skipped; registers init.d/systemd)
+# --module=plus is passed at runtime via bin/solr start -j (replaces NHETIO-2225 awk hack)
+RUN cp /opt/solr/current/server/resources/log4j2.xml /var/solr/ \
+    && printf '%s\n' \
+         'SOLR_HOME="/opt/solr/current/server/solr"' \
+         'SOLR_PID_DIR="/var/solr"' \
+         'SOLR_LOGS_DIR="/var/solr/logs"' \
+         'LOG4J_PROPS="/var/solr/log4j2.xml"' \
+         'SOLR_PORT="8081"' \
+         'RUNAS="evolve"' \
+       > /etc/default/solr.in.sh
+
+# 8. New Relic agent — mirrors: packer/solr.pkr.hcl "Copy NewRelic assets" (CI-staged)
+# install_newrelic.sh skipped (IMDS-dependent); license key injected by entrypoint
+COPY newrelic-java.zip /opt/newrelic/
+RUN unzip -q /opt/newrelic/newrelic-java.zip -d /opt/newrelic/ \
+    && cp -rf /opt/newrelic /opt/solr/current/newrelic \
+    && rm /opt/newrelic/newrelic-java.zip
+
+# 9. Entrypoint + permissions
+COPY master/docker-entrypoint.sh /opt/tio/docker-entrypoint.sh
+RUN chmod +x /opt/tio/docker-entrypoint.sh \
+    && chown -R evolve:evolve /opt/solr/ /opt/tio/ /var/solr/ /etc/default/solr.in.sh
+
+EXPOSE 8081
+USER evolve
+ENTRYPOINT ["/opt/tio/docker-entrypoint.sh"]

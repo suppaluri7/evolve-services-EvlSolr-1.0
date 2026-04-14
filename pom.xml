@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.elsevier.evolve</groupId>
+    <artifactId>evl-solr</artifactId>
+    <version>1.2.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <distributionManagement>
+        <repository>
+            <id>ehsevolve-dev-releases</id>
+            <name>Elsevier HS Evolve Maven Dev Release Repository</name>
+            <url>s3://ehsevolve-repository/maven/dev/releases</url>
+        </repository>
+        <snapshotRepository>
+            <id>ehsevolve-dev-snapshots</id>
+            <name>Elsevier HS Evolve Maven Dev Snapshot Repository</name>
+            <url>s3://ehsevolve-repository/maven/dev/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <build>
+        <extensions>
+            <extension>
+                <groupId>com.github.seahen</groupId>
+                <artifactId>maven-s3-wagon</artifactId>
+                <version>1.3.3</version>
+            </extension>
+        </extensions>
+    </build>
+</project>

@@ -1,0 +1,458 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<dataConfig>
+    <dataSource name="jdbc" jndiName="jdbc/evolve" type="JdbcDataSource" />
+    <script><![CDATA[
+        function TransformAuthor(row) {
+            var firstName = row.get('FIRST_NAME');
+            var lastName = row.get('LAST_NAME');
+            var degrees = row.get('DEGREE_LETTERS');
+            var author = '';
+            if (firstName != null) {
+                author += firstName;
+            }
+            if (lastName != null) {
+                author += (((firstName != null) ? ' ' : '' ) +lastName);
+            }
+            var shortAuthor = author;
+            if (degrees != null) {
+                author += (', ' +degrees);
+            }
+            row.put('shortAuthor', shortAuthor);
+            row.put('author', author);
+            return row;
+        }
+
+        function TransformOrigin(row) {
+            var origin = row.get('LARGE_STRING_VALUE');
+            row.put('contactOriginRelevancy', parseFloat((origin == '"US"') ? "1.0" : "0.0"));
+            return row;
+        }
+
+        function TransformFormats(row) {
+            var JSON={};
+            var platformString = row.get('LARGE_STRING_VALUE');
+            var ArrayList = Java.type('java.util.ArrayList');
+            var platformKeys = new ArrayList();
+            if (platformString!= null) {
+                var parsablePlatformString = "(" + platformString.toString() + ")";
+                var platforms= eval(parsablePlatformString);
+
+                for (var k in platforms) {
+                    platformKeys.add(k);
+                }
+            }
+            row.put('availableFormat', platformKeys);
+            return row;
+        }
+
+        function TransformAuthors(row) {
+            if (authorHtml != "") {
+                row.put('authorHtml', authorHtml);
+            }
+            return row;
+        }
+
+        function TransformPriceAndEdition(row) {
+            var evolvePrice = row.get('PRICE');
+            var ppmPrice = row.get('PPM_PRICE');
+            var ppmPriceCAD = row.get('PPM_PRICE_CAD');
+            var edition = row.get('EDITION_NUMBER');
+
+            if (ppmPriceCAD == null) {
+                ppmPriceCAD = "0.0";
+            }
+            if (ppmPrice != null) {
+                evolvePrice = ppmPrice;
+            }
+            if (evolvePrice == null) {
+                evolvePrice = "0.0";
+            }
+            if (edition == null) {
+                edition = "1.0";
+            }
+
+            row.put('listPrice',parseFloat(evolvePrice));
+            row.put('listPriceCAD',parseFloat(ppmPriceCAD));
+            row.put('edition', parseFloat(edition));
+            return row;
+        }
+
+        function GenerateFacultyPrice(row) {
+            var facultyPrice = row.get('ORIGINAL_PRICE');
+            var facultyPriceCAD = row.get('ORIGINAL_PRICE_CAD');
+            var productType = row.get('PRODUCT_TYPE_KEY');
+            var eFlag = row.get('EFLAG');
+            if (eFlag == "Y") {
+                if (productType.toLowerCase().indexOf("ebook") == -1) {
+                    facultyPrice = "0.0";
+                    facultyPriceCAD = "0.0";
+                }
+            }
+            row.put('facultyPrice', parseFloat(facultyPrice));
+            row.put('facultyPriceCAD', parseFloat(facultyPriceCAD));
+            return row;
+        }
+
+        function TransformDiscSpec(row) {
+            var discId = row.get('DISCIPLINE_ID');
+            var specId = row.get('SPECIALTY_ID');
+            var category_id = "ds_";
+            if (discId != null) {
+                category_id += discId;
+            }
+            if (specId != null) {
+                category_id += ("_" + specId);
+            }
+            row.put('category_id', category_id);
+            return row;
+        }
+
+        function TransformProgramTaxonomySpec(row) {
+            var categoryId = row.get('PROGRAM_CATEGORY_ID');
+            var categorySubId = row.get('PROGRAM_SUB_CATEGORY_ID');
+            var programCategoryId = "pc_";
+            if (categoryId != null) {
+                programCategoryId += categoryId;
+            }
+            if (categorySubId != null) {
+                programCategoryId += ("_" + categorySubId);
+            }
+            row.put('programCategoryId', programCategoryId);
+            return row;
+        }
+
+        function TransformRelatedProductResourceDetailsSpec(row) {
+            var resourceKey = row.get('RESOURCE_KEY');
+            var name = row.get('NAME');
+            var resourceTypeKey = row.get('RESOURCE_TYPE_KEY');
+            var productTypeKey = row.get('PRODUCT_TYPE_KEY');
+            var catalogProductTypeKey = row.get('CATALOG_PRODUCT_TYPE_KEY');
+            var editionNumber = row.get('EDITION_NUMBER');
+            var copyRightYear = row.get('COPYRIGHT_YEAR');
+            var relatedProductRelevancy = row.get('RELATED_PRODUCT_RELEVANCY');
+            var role = row.get('ROLE');
+            var evolvePrice = row.get('PRICE');
+            var ppmPrice = row.get('PPM_PRICE');
+            var ppmPriceCAD = row.get('PPM_PRICE_CAD');
+
+            if (ppmPriceCAD == null) {
+                ppmPriceCAD = "0.0";
+            }
+             if (ppmPrice != null) {
+                evolvePrice = ppmPrice;
+            }
+            if (evolvePrice == null) {
+                evolvePrice = "0.0";
+            }
+
+            var relatedProductResourceDetails = "";
+            if (resourceKey != null) {
+                relatedProductResourceDetails += (resourceKey + ";");
+            }
+            if (name != null) {
+                relatedProductResourceDetails += (name + ";");
+            }
+            if (resourceTypeKey != null) {
+                relatedProductResourceDetails += (resourceTypeKey + ";");
+            }
+            if (productTypeKey != null) {
+                relatedProductResourceDetails += (productTypeKey + ";");
+            }
+            if (catalogProductTypeKey != null) {
+                relatedProductResourceDetails += (catalogProductTypeKey + ";");
+            }
+            if (editionNumber != null) {
+                relatedProductResourceDetails += editionNumber;
+            }
+            relatedProductResourceDetails += ";";
+            if (copyRightYear != null) {
+                relatedProductResourceDetails += (copyRightYear + ";");
+            }
+            if (evolvePrice != null) {
+                relatedProductResourceDetails += (parseFloat(evolvePrice) + ";");
+            }
+            if (ppmPriceCAD != null) {
+                relatedProductResourceDetails += (parseFloat(ppmPriceCAD) + ";");
+            }
+            if (relatedProductRelevancy != null) {
+                relatedProductResourceDetails += (relatedProductRelevancy + ";");
+            }
+            if (role != null) {
+                relatedProductResourceDetails += (role);
+            }
+            row.put('relatedProductDetails', relatedProductResourceDetails);
+            return row;
+        }
+		
+		function PopulateNclexFilterInfo(row) {
+			var name = row.get('NAME');
+			if (name != null && name.toLowerCase().indexOf("nclex") > -1) {
+				row.put('nclexType', row.get('PRODUCT_TYPE_KEY'));
+			} else {
+				row.put('nclexType', null);
+			}
+            return row;
+        }
+
+        function TransformNextEditionDetailsSpec(row) {
+            var resourceKey = row.get('RESOURCE_KEY');
+            var name = row.get('NAME');
+            var resourceTypeKey = row.get('RESOURCE_TYPE_KEY');
+            var productTypeKey = row.get('PRODUCT_TYPE_KEY');
+            var catalogProductTypeKey = row.get('CATALOG_PRODUCT_TYPE_KEY');
+            var editionNumber = row.get('EDITION_NUMBER');
+            var copyRightYear = row.get('COPYRIGHT_YEAR');
+            var role = row.get('ROLE');
+            var evolvePrice = row.get('PRICE');
+            var ppmPrice = row.get('PPM_PRICE');
+            var ppmPriceCAD = row.get('PPM_PRICE_CAD');
+
+            if (ppmPriceCAD == null) {
+                ppmPriceCAD = "0.0";
+            }
+            if (ppmPrice != null) {
+                evolvePrice = ppmPrice;
+            }
+            if (evolvePrice == null) {
+                evolvePrice = "0.0";
+            }
+
+            var nextEditionDetails = "";
+            if (resourceKey != null) {
+                nextEditionDetails += (resourceKey + ";");
+            }
+            if (name != null) {
+                nextEditionDetails += (name + ";");
+            }
+            if (resourceTypeKey != null) {
+                nextEditionDetails += (resourceTypeKey + ";");
+            }
+            if (productTypeKey != null) {
+                nextEditionDetails += (productTypeKey + ";");
+            }
+            if (catalogProductTypeKey != null) {
+                nextEditionDetails += (catalogProductTypeKey + ";");
+            }
+
+            if (editionNumber != null) {
+                nextEditionDetails += editionNumber;
+            }
+            nextEditionDetails += ";";
+
+            if (copyRightYear != null) {
+                nextEditionDetails += (copyRightYear + ";");
+            }
+            if (evolvePrice != null) {
+                nextEditionDetails += (parseFloat(evolvePrice) + ";");
+            }
+            if (ppmPriceCAD != null) {
+                nextEditionDetails += (parseFloat(ppmPriceCAD) + ";");
+            }
+            if (role != null) {
+                nextEditionDetails += (role);
+            }
+            row.put('nextEditionDetails', nextEditionDetails);
+            return row;
+        }
+    ]]></script>
+    <document>
+        <entity name="resource"
+                query="select * from evladmin.evolve_resource where resource_type_id=5"
+                deltaImportQuery="select * from evladmin.evolve_resource
+                                  where resource_type_id=5 and RESOURCE_ID='${dataimporter.delta.RESOURCE_ID}'"
+                deltaQuery="select RESOURCE_ID from evladmin.base_product_resource
+                            where update_date &gt; to_date('${dataimporter.last_index_time}','yyyy-mm-dd hh24:mi:ss')">
+            <field column="RESOURCE_ID" name="id" />
+            <field column="NAME" name="name" />
+            <field column="RESOURCE_KEY" name="resourceId" />
+            <entity name="resource_type"
+                    query="select resource_type_key from evladmin.resource_type
+                           where resource_type_id='${resource.RESOURCE_TYPE_ID}'">
+                <field column="RESOURCE_TYPE_KEY" name="type" />
+            </entity>
+            <entity name="base_product_resource" transformer="script:TransformPriceAndEdition"
+                    query="select ppm_price,ppm_price_cad, (case when ppm_price is not null then ppm_price else price end) as price,
+                           product_type_id,TO_CHAR(pub_date, 'yyyy-mm-dd&quot;T&quot;hh24:mi:ss&quot;Z&quot;') as PUB_DATE,
+                           pub_status_id,next_edition_isbn,copyright_year,edition_number,sbu_code,profit_center_code,major_subject_code,archived
+                           from evladmin.base_product_resource
+                           where resource_id='${resource.RESOURCE_ID}'">
+                <field column="PPM_PRICE" name="ppmPrice"/>
+                <field column="PPM_PRICE_CAD" name="ppmPriceCAD"/>
+                <field column="PRICE" name="evolvePrice"/>
+                <field column="PUB_DATE" name="pubDate"/>
+                <field column="PUB_STATUS_ID" name="pubStatusId"/>
+                <field column="COPYRIGHT_YEAR" name="copyYear"/>
+                <field column="listPrice" name="listPrice"/>
+                <field column="edition" name="edition"/>
+                <field column="archived" name="archived"/>
+                <entity name="disciplineSpeciality" transformer="script:TransformDiscSpec"
+                        query="select t.discipline_id as DISCIPLINE_ID,t.specialty_id as SPECIALTY_ID
+                               from evladmin.disc_spec_peak_taxonomy t,evladmin.smart_taxonomy_sbu_pc_msc st
+                               where t.taxonomy_id = st.taxonomy_id
+                               and st.sbu_code = '${base_product_resource.SBU_CODE}'
+                               and st.profit_center_code = '${base_product_resource.PROFIT_CENTER_CODE}'
+                               and st.major_subject_code = '${base_product_resource.MAJOR_SUBJECT_CODE}'">
+                    <field column="category_id" name="category_id"/>
+                </entity>
+                <entity name="programTaxonomy" transformer="script:TransformProgramTaxonomySpec"
+                        query="select t.program_category_id as PROGRAM_CATEGORY_ID,t.program_sub_category_id as PROGRAM_SUB_CATEGORY_ID
+                               from evladmin.program_category_taxonomy t,evladmin.smart_taxonomy_sbu_pc_msc st
+                               where t.taxonomy_id = st.taxonomy_id
+                               and st.sbu_code = '${base_product_resource.SBU_CODE}'
+                               and st.profit_center_code = '${base_product_resource.PROFIT_CENTER_CODE}'
+                               and st.major_subject_code = '${base_product_resource.MAJOR_SUBJECT_CODE}'">
+                    <field column="programCategoryId" name="programCategoryId"/>
+                </entity>
+                <entity name="related_product_resource_details" transformer="script:TransformRelatedProductResourceDetailsSpec"
+                        query="select distinct e.RESOURCE_KEY as RESOURCE_KEY,e.name as NAME, rt.resource_type_key as RESOURCE_TYPE_KEY,
+                               pt.product_type_key as PRODUCT_TYPE_KEY,pt.catalog_product_type_key as CATALOG_PRODUCT_TYPE_KEY,
+                               bpr.edition_number as EDITION_NUMBER, bpr.copyright_year as COPYRIGHT_YEAR,bpr.ppm_price as PPM_PRICE,
+                               bpr.ppm_price_cad as PPM_PRICE_CAD, bpr.price as PRICE,pt.relevancy as RELATED_PRODUCT_RELEVANCY,er1.role_id as ROLE
+                               from evladmin.evolve_resource e,evladmin.related_product p ,evladmin.resource_type rt,
+                               evladmin.BASE_PRODUCT_RESOURCE bpr, evladmin.product_type pt, evladmin.product_resource pr,
+                               evladmin.evolve_resource er1
+                               where e.resource_id=p.related_resource_id
+                               and bpr.resource_id=p.related_resource_id
+                               and pr.base_product_resource_id = p.related_resource_id
+                               and er1.resource_id = pr.resource_id
+                               and relationship_type_id IN (1,2)
+                               and bpr.pub_status_id not in (1,7)
+                               and (bpr.archived is null or bpr.archived = 'N')
+                               and e.resource_type_id = rt.resource_type_id
+                               and pt.product_type_id = bpr.product_type_id
+                               and p.resource_id='${resource.RESOURCE_ID}'
+                               and pr.include_in_search_flag ='Y'
+                               and er1.published_flag='Y'
+                               order by pt.relevancy desc,pt.product_type_key,bpr.copyright_year desc">
+                    <field name="relatedProductDetails" column="relatedProductDetails"/>
+                </entity>
+                <entity name="next_edition_details" transformer="script:TransformNextEditionDetailsSpec"
+                        query="select distinct e.RESOURCE_KEY as RESOURCE_KEY, (select er.Name from evladmin.evolve_resource er where er.resource_key = e.resource_key and er.resource_type_id = 5) as NAME, rt.resource_type_key as RESOURCE_TYPE_KEY,
+                               pt.product_type_key as PRODUCT_TYPE_KEY, pt.catalog_product_type_key as CATALOG_PRODUCT_TYPE_KEY,
+                               bpr.edition_number as EDITION_NUMBER, bpr.copyright_year as COPYRIGHT_YEAR,
+                               bpr.ppm_price as PPM_PRICE, bpr.ppm_price_cad as PPM_PRICE_CAD,
+                               bpr.price as PRICE, e.role_id as ROLE
+                               from evladmin.evolve_resource e, evladmin.resource_type rt, evladmin.BASE_PRODUCT_RESOURCE bpr,
+                               evladmin.product_type pt, evladmin.product_resource pr
+                               where e.resource_key='${base_product_resource.NEXT_EDITION_ISBN}'
+                               and e.resource_type_id IN (1,2)
+                               and e.resource_id = pr.resource_id
+                               and e.resource_type_id = rt.resource_type_id
+                               and pr.base_product_resource_id = bpr.resource_id
+                               and pt.product_type_id = bpr.product_type_id
+                               and bpr.pub_status_id not in (1,7)
+                               and (bpr.archived is null or bpr.archived = 'N')
+                               and pr.include_in_search_flag ='Y'
+                               and e.published_flag='Y'">
+                    <field name="nextEditionDetails" column="nextEditionDetails"/>
+                </entity>
+                <entity name="isbnJsonData" transformer="ClobTransformer"
+                        query="select jd.large_string_value from evladmin.json_data jd
+                               where jd.resource_id = '${resource.RESOURCE_ID}' and jd.name='isbn10'">
+                    <field column="LARGE_STRING_VALUE" clob="true" name="isbn10" />
+                </entity>
+                <entity name="contactOriginJsonData" transformer="ClobTransformer,script:TransformOrigin"
+                        query="select jd.large_string_value from evladmin.json_data jd
+                               where jd.resource_id = '${resource.RESOURCE_ID}' and jd.name='contactOrigin'">
+                    <field column="LARGE_STRING_VALUE" clob="true" name="contactOrigin" />
+                    <field column="contactOriginRelevancy" name="contactOriginRelevancy" />
+                </entity>
+                <entity name="ancillaryJSONdata" transformer="ClobTransformer"
+                        query="select jd.large_string_value from evladmin.json_data jd
+                               where jd.resource_id = '${resource.RESOURCE_ID}' and jd.name ='ancillary'">
+                    <field column="LARGE_STRING_VALUE" clob="true" name="ancillary" />
+                </entity>
+                <entity name="coreProductJsonData" transformer="ClobTransformer"
+                        query="select jd.large_string_value from evladmin.json_data jd
+                               where jd.resource_id = '${resource.RESOURCE_ID}' and jd.name ='coreProductFlag'">
+                    <field column="LARGE_STRING_VALUE" clob="true" name="coreProductFlag" />
+                </entity>
+                <entity name="product_type" transformer="script:GenerateFacultyPrice"
+                        query="select product_type_key,name,category,${base_product_resource.listPrice} as ORIGINAL_PRICE,
+                               ${base_product_resource.listPriceCAD} as ORIGINAL_PRICE_CAD,product_type_id,eflag,relevancy
+                               from evladmin.product_type where product_type_id='${base_product_resource.PRODUCT_TYPE_ID}'">
+                    <field column="PRODUCT_TYPE_KEY" name="productType"/>
+                    <field column="NAME" name="productTypeName"/>
+                    <field column="EFLAG" name="eFlag"/>
+                    <field column="RELEVANCY" name="relevancy"/>
+                    <field column="facultyPrice" name="facultyPrice"/>
+                    <field column="facultyPriceCAD" name="facultyPriceCAD"/>
+                    <field column="CATEGORY" name="category"/>
+                </entity>
+                <entity name="authors" transformer="script:TransformAuthor"
+                        query="select first_name,last_name, degree_letters
+                               from evladmin.author where resource_id=${resource.RESOURCE_ID} order by display_order asc">
+                    <field name="author" column="author"/>
+                    <field name="shortAuthor" column="shortAuthor"/>
+                    <field name="authorSort" column="LAST_NAME"/>
+                </entity>
+                <entity name="facultyProduct"
+                        query="select e.RESOURCE_ID as FACULTY_ID,p.include_in_search_flag as SEARCH_FLAG,p.marketing_url,
+                               lower(r.name) as ROLE_NAME,e.published_flag as PUB_FLAG
+                               from evladmin.evolve_resource e,evladmin.product_resource p,evladmin.role r
+                               where e.resource_id=p.resource_id
+                               and r.role_id=e.role_id
+                               and r.role_id=6
+                               and p.base_product_resource_id= '${resource.RESOURCE_ID}'
+                               and e.published_flag='Y'">
+                    <field name="role" column="ROLE_NAME"/>
+                    <field name="faculty-publish-flag" column="PUB_FLAG"/>
+                    <field name="faculty-search-flag" column="SEARCH_FLAG"/>
+                    <entity name="jsonData" transformer="ClobTransformer,script:TransformFormats"
+                            query="select large_string_value from evladmin.json_data
+                                   where resource_id='${facultyProduct.FACULTY_ID}' and name='platforms'">
+                        <field column="LARGE_STRING_VALUE" clob="true" name="format" />
+                        <field column="availableFormat" name="availableFormat" />
+                    </entity>
+                    <entity name="jsonData" transformer="ClobTransformer"
+                            query="select jd.large_string_value from evladmin.json_data jd
+                                   where jd.resource_id='${facultyProduct.FACULTY_ID}' and jd.name='sites'">
+                        <field column="LARGE_STRING_VALUE" clob="true" name="faculty-sites" />
+                    </entity>
+                </entity>
+                <entity name="studentProduct"
+                        query="select e.RESOURCE_ID as STUDENT_ID,p.include_in_search_flag as SEARCH_FLAG,p.marketing_url,
+                               lower(r.name) as ROLE_NAME,e.published_flag as PUB_FLAG
+                               from evladmin.evolve_resource e,evladmin.product_resource p,evladmin.role r
+                               where e.resource_id=p.resource_id
+                               and r.role_id=e.role_id
+                               and r.role_id=5
+                               and p.base_product_resource_id= '${resource.RESOURCE_ID}'
+                               and e.published_flag='Y'">
+                    <field name="role" column="ROLE_NAME"/>
+                    <field name="student-publish-flag" column="PUB_FLAG"/>
+                    <field name="student-search-flag" column="SEARCH_FLAG"/>
+                    <entity name="jsonData" transformer="ClobTransformer"
+                            query="select jd.large_string_value from evladmin.json_data jd
+                                   where jd.resource_id='${studentProduct.STUDENT_ID}' and jd.name='sites'">
+                        <field column="LARGE_STRING_VALUE" clob="true" name="student-sites" />
+                    </entity>
+                </entity>
+                <entity name="studentAdminData"
+                        query="select to_char(update_date,'MM/DD/YY') as UPDATE_DATE,update_by,published_flag
+                               from evladmin.evolve_resource
+                               where resource_key='${resource.RESOURCE_KEY}' and role_id=6">
+                    <field name="statusFaculty" column="PUBLISHED_FLAG"/>
+                    <field name="modifiedDateFaculty" column="UPDATE_DATE"/>
+                    <field name="modifiedByFaculty" column="UPDATE_BY"/>
+                </entity>
+                <entity name="facultyAdminData"
+                        query="select to_char(update_date,'MM/DD/YY') as UPDATE_DATE,update_by,published_flag
+                               from evladmin.evolve_resource
+                               where resource_key='${resource.RESOURCE_KEY}' and role_id=5">
+                    <field name="statusStudent" column="PUBLISHED_FLAG"/>
+                    <field name="modifiedDateStudent" column="UPDATE_DATE"/>
+                    <field name="modifiedByStudent" column="UPDATE_BY"/>
+                </entity>
+                <entity name="nclexTypeData" transformer="script:PopulateNclexFilterInfo"
+                        query="select er.NAME as NAME, pt.product_type_key as PRODUCT_TYPE_KEY
+                           from evladmin.evolve_resource er
+                               join evladmin.BASE_PRODUCT_RESOURCE bpr on er.resource_id=bpr.resource_id
+                               join evladmin.product_type pt on bpr.product_type_id=pt.product_type_id
+                           where er.resource_id = ${resource.RESOURCE_ID} and pt.product_type_id = ${base_product_resource.PRODUCT_TYPE_ID}">
+					<field column="nclexType" name="nclexType" />
+                </entity>
+            </entity>
+        </entity>
+    </document>
+</dataConfig>
