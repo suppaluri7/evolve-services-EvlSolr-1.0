@@ -4730,3 +4730,580 @@ function rt_update_tio_utils_script() {
 #######################################################################################
 ### END of Artifactory Integration Functions
 #######################################################################################
+
+#######################################################################################
+### EvlSolr Container Deployment Functions  (NHETIO-4421 / NHETIO-4422)
+### Pattern mirrors rt_fluentbit_* exactly:
+###   helpers → _rt_evlsolr{master,slave}_run_container → rt_evlsolr{master,slave}_start_container
+###   → rt_evlsolr{master,slave}_deploy (public entry point called by Jenkins/EC2 userdata)
+#######################################################################################
+
+# -------------------------------------------------- HELPERS --------------------------------------------------
+
+# @name: rt_evlsolr_get_artifactory_docker_repo
+# @usage: rt_evlsolr_get_artifactory_docker_repo [override_repo]
+# @description: Returns the Artifactory Docker repository name for EvlSolr images.
+#               Checks ARTIFACTORY_EVLSOLR_DOCKER_REPO env var, then optional arg, then default.
+# @stdout: Docker repository name (e.g., docker-evolve-bo-services-releases-local)
+function rt_evlsolr_get_artifactory_docker_repo() {
+  local func_name="rt_evlsolr_get_artifactory_docker_repo"
+  local default_repo="${1:-docker-evolve-bo-services-releases-local}"
+  local repo_to_use
+
+  if [[ -n "${ARTIFACTORY_EVLSOLR_DOCKER_REPO:-}" ]]; then
+    repo_to_use="${ARTIFACTORY_EVLSOLR_DOCKER_REPO}"
+    _log "INFO" "${func_name}" "Using EvlSolr Docker repo from ARTIFACTORY_EVLSOLR_DOCKER_REPO: ${repo_to_use}"
+  else
+    repo_to_use="${default_repo}"
+    _log "INFO" "${func_name}" "Using default EvlSolr Docker repo: ${repo_to_use}"
+  fi
+  echo "${repo_to_use}"
+  return 0
+}
+
+# @name: rt_evlsolr_get_artifactory_server_fqdn
+# @usage: rt_evlsolr_get_artifactory_server_fqdn [override_fqdn]
+# @description: Returns the Artifactory server FQDN for EvlSolr Docker pulls.
+#               Checks ARTIFACTORY_DOCKER_SERVER_FQDN, then ARTIFACTORY_URL, then default.
+# @stdout: Artifactory FQDN (e.g., health.artifactory.tio.systems)
+function rt_evlsolr_get_artifactory_server_fqdn() {
+  local func_name="rt_evlsolr_get_artifactory_server_fqdn"
+  local default_fqdn="${1:-health.artifactory.tio.systems}"
+  local fqdn_to_use
+
+  if [[ -n "${ARTIFACTORY_DOCKER_SERVER_FQDN:-}" ]]; then
+    fqdn_to_use="${ARTIFACTORY_DOCKER_SERVER_FQDN}"
+    _log "INFO" "${func_name}" "Using Artifactory FQDN from ARTIFACTORY_DOCKER_SERVER_FQDN: ${fqdn_to_use}"
+  elif [[ -n "${ARTIFACTORY_URL:-}" ]]; then
+    fqdn_to_use=$(echo "${ARTIFACTORY_URL}" | sed -e 's|^[^/]*//||' -e 's|/.*$||')
+    _log "INFO" "${func_name}" "Using Artifactory FQDN derived from ARTIFACTORY_URL: ${fqdn_to_use}"
+  else
+    fqdn_to_use="${default_fqdn}"
+    _log "INFO" "${func_name}" "Using default Artifactory FQDN: ${fqdn_to_use}"
+  fi
+  echo "${fqdn_to_use}"
+  return 0
+}
+
+# -------------------------------------------------- CORE (internal) ------------------------------------------
+
+# @name: _rt_evlsolrmaster_run_container
+# @usage: _rt_evlsolrmaster_run_container $1 $2 $3 $4
+# @description: (Internal) Stop old EvlSolrMaster container, docker login to Artifactory,
+#               docker run the new image, docker logout.
+# @args:
+#   $1: image_version_to_deploy  (e.g., "1.2.0-10094")
+#   $2: artifactory_docker_repo  (e.g., docker-evolve-bo-services-releases-local)
+#   $3: artifactory_server_fqdn  (e.g., health.artifactory.tio.systems)
+#   $4: comma_separated_env_vars (e.g., "EVOLVE_INSTANCE_ENV=dev,AWS_REGION=us-east-2")
+# @return: 0 on success, non-zero on failure.
+function _rt_evlsolrmaster_run_container() {
+  local func_name="_rt_evlsolrmaster_run_container"
+  local image_version_to_deploy="${1}"
+  local artifactory_docker_repo="${2}"
+  local artifactory_server_fqdn="${3}"
+  local comma_separated_env_vars="${4}"
+
+  local CONTAINER_NAME="evolve-solr-master"
+  local IMAGE_NAME="evlsolrmaster"
+  local full_image_path="${artifactory_docker_repo}.${artifactory_server_fqdn}/${IMAGE_NAME}:${image_version_to_deploy}"
+
+  local artifactory_secret_json artifactory_username artifactory_token
+
+  if [[ -z "${image_version_to_deploy}" || -z "${artifactory_docker_repo}" || -z "${artifactory_server_fqdn}" ]]; then
+    _log "ERROR" "${func_name}" "Missing required arguments: image version, docker repo, or server FQDN."
+    return 1
+  fi
+
+  _log "INFO" "${func_name}" "Preparing to run EvlSolrMaster container version: ${image_version_to_deploy}"
+  _log "INFO" "${func_name}" "Full image path: ${full_image_path}"
+
+  # STEP 1: Stop and remove any existing EvlSolrMaster container
+  _log "INFO" "${func_name}" "Stopping existing '${CONTAINER_NAME}' container if present..."
+  if docker ps -a --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
+    docker container stop "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+    docker container rm   "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+    _log "INFO" "${func_name}" "Stopped and removed container: ${CONTAINER_NAME}"
+  else
+    _log "INFO" "${func_name}" "No existing '${CONTAINER_NAME}' container found."
+  fi
+
+  # STEP 2: Fetch Artifactory credentials and docker login
+  _log "INFO" "${func_name}" "Fetching Artifactory credentials (secret: all/hs/evolve/tio-artifactory/service-user-credentials)..."
+  artifactory_secret_json=$(rt_fetch_artifactory_secret)
+  if [[ $? -ne 0 || -z "${artifactory_secret_json}" ]]; then
+    _log "ERROR" "${func_name}" "Failed to fetch Artifactory credentials."
+    return 1
+  fi
+  artifactory_username=$(jq -r '.username' <<< "${artifactory_secret_json}")
+  artifactory_token=$(jq    -r '.password' <<< "${artifactory_secret_json}")
+
+  if [[ -z "${artifactory_username}" || "${artifactory_username}" == "null" ||
+        -z "${artifactory_token}"    || "${artifactory_token}"    == "null" ]]; then
+    _log "ERROR" "${func_name}" "Invalid Artifactory credentials parsed from secret."
+    return 1
+  fi
+
+  _log "INFO" "${func_name}" "Logging into Artifactory Docker registry: ${artifactory_docker_repo}.${artifactory_server_fqdn}"
+  if ! echo "${artifactory_token}" | docker login -u "${artifactory_username}" --password-stdin \
+       "${artifactory_docker_repo}.${artifactory_server_fqdn}"; then
+    _log "ERROR" "${func_name}" "Docker login failed."
+    return 1
+  fi
+
+  # STEP 3: docker run
+  _log "INFO" "${func_name}" "Starting container ${CONTAINER_NAME} from image ${full_image_path}..."
+  local docker_cmd_array=(docker run -d --name "${CONTAINER_NAME}")
+
+  if [[ -n "${comma_separated_env_vars}" ]]; then
+    local env_array
+    mapfile -t env_array < <(echo "${comma_separated_env_vars}" | tr ',' '\n')
+    for item in "${env_array[@]}"; do
+      docker_cmd_array+=("-e" "${item}")
+    done
+  fi
+
+  docker_cmd_array+=("-p" "8081:8081")
+  docker_cmd_array+=("--restart" "unless-stopped")
+  docker_cmd_array+=("${full_image_path}")
+
+  _log "DEBUG" "${func_name}" "Final Docker command: ${docker_cmd_array[*]}"
+  "${docker_cmd_array[@]}"
+  local run_status=$?
+
+  # STEP 4: docker logout regardless of run result
+  _log "INFO" "${func_name}" "Logging out from Artifactory Docker registry."
+  docker logout "${artifactory_docker_repo}.${artifactory_server_fqdn}" >/dev/null 2>&1 || true
+
+  if [[ ${run_status} -ne 0 ]]; then
+    _log "ERROR" "${func_name}" "docker run failed with status ${run_status}."
+    return ${run_status}
+  fi
+
+  _log "INFO" "${func_name}" "EvlSolrMaster container started successfully."
+  return 0
+}
+
+# @name: _rt_evlsolrslave_run_container
+# @usage: _rt_evlsolrslave_run_container $1 $2 $3 $4
+# @description: (Internal) Stop old EvlSolrSlave container, docker login to Artifactory,
+#               docker run the new image, docker logout.
+#               Identical to master except CONTAINER_NAME, IMAGE_NAME, and SOLR_MASTER_URL env var.
+# @args:
+#   $1: image_version_to_deploy  (e.g., "1.2.0-10094")
+#   $2: artifactory_docker_repo  (e.g., docker-evolve-bo-services-releases-local)
+#   $3: artifactory_server_fqdn  (e.g., health.artifactory.tio.systems)
+#   $4: comma_separated_env_vars (e.g., "EVOLVE_INSTANCE_ENV=dev,AWS_REGION=us-east-2,SOLR_MASTER_URL=http://...")
+# @return: 0 on success, non-zero on failure.
+function _rt_evlsolrslave_run_container() {
+  local func_name="_rt_evlsolrslave_run_container"
+  local image_version_to_deploy="${1}"
+  local artifactory_docker_repo="${2}"
+  local artifactory_server_fqdn="${3}"
+  local comma_separated_env_vars="${4}"
+
+  local CONTAINER_NAME="evolve-solr-slave"
+  local IMAGE_NAME="evlsolrslave"
+  local full_image_path="${artifactory_docker_repo}.${artifactory_server_fqdn}/${IMAGE_NAME}:${image_version_to_deploy}"
+
+  local artifactory_secret_json artifactory_username artifactory_token
+
+  if [[ -z "${image_version_to_deploy}" || -z "${artifactory_docker_repo}" || -z "${artifactory_server_fqdn}" ]]; then
+    _log "ERROR" "${func_name}" "Missing required arguments: image version, docker repo, or server FQDN."
+    return 1
+  fi
+
+  _log "INFO" "${func_name}" "Preparing to run EvlSolrSlave container version: ${image_version_to_deploy}"
+  _log "INFO" "${func_name}" "Full image path: ${full_image_path}"
+
+  # STEP 1: Stop and remove any existing EvlSolrSlave container
+  _log "INFO" "${func_name}" "Stopping existing '${CONTAINER_NAME}' container if present..."
+  if docker ps -a --format "{{.Names}}" | grep -q "^${CONTAINER_NAME}$"; then
+    docker container stop "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+    docker container rm   "${CONTAINER_NAME}" >/dev/null 2>&1 || true
+    _log "INFO" "${func_name}" "Stopped and removed container: ${CONTAINER_NAME}"
+  else
+    _log "INFO" "${func_name}" "No existing '${CONTAINER_NAME}' container found."
+  fi
+
+  # STEP 2: Fetch Artifactory credentials and docker login
+  _log "INFO" "${func_name}" "Fetching Artifactory credentials (secret: all/hs/evolve/tio-artifactory/service-user-credentials)..."
+  artifactory_secret_json=$(rt_fetch_artifactory_secret)
+  if [[ $? -ne 0 || -z "${artifactory_secret_json}" ]]; then
+    _log "ERROR" "${func_name}" "Failed to fetch Artifactory credentials."
+    return 1
+  fi
+  artifactory_username=$(jq -r '.username' <<< "${artifactory_secret_json}")
+  artifactory_token=$(jq    -r '.password' <<< "${artifactory_secret_json}")
+
+  if [[ -z "${artifactory_username}" || "${artifactory_username}" == "null" ||
+        -z "${artifactory_token}"    || "${artifactory_token}"    == "null" ]]; then
+    _log "ERROR" "${func_name}" "Invalid Artifactory credentials parsed from secret."
+    return 1
+  fi
+
+  _log "INFO" "${func_name}" "Logging into Artifactory Docker registry: ${artifactory_docker_repo}.${artifactory_server_fqdn}"
+  if ! echo "${artifactory_token}" | docker login -u "${artifactory_username}" --password-stdin \
+       "${artifactory_docker_repo}.${artifactory_server_fqdn}"; then
+    _log "ERROR" "${func_name}" "Docker login failed."
+    return 1
+  fi
+
+  # STEP 3: docker run
+  _log "INFO" "${func_name}" "Starting container ${CONTAINER_NAME} from image ${full_image_path}..."
+  local docker_cmd_array=(docker run -d --name "${CONTAINER_NAME}")
+
+  if [[ -n "${comma_separated_env_vars}" ]]; then
+    local env_array
+    mapfile -t env_array < <(echo "${comma_separated_env_vars}" | tr ',' '\n')
+    for item in "${env_array[@]}"; do
+      docker_cmd_array+=("-e" "${item}")
+    done
+  fi
+
+  docker_cmd_array+=("-p" "8081:8081")
+  docker_cmd_array+=("--restart" "unless-stopped")
+  docker_cmd_array+=("${full_image_path}")
+
+  _log "DEBUG" "${func_name}" "Final Docker command: ${docker_cmd_array[*]}"
+  "${docker_cmd_array[@]}"
+  local run_status=$?
+
+  # STEP 4: docker logout regardless of run result
+  _log "INFO" "${func_name}" "Logging out from Artifactory Docker registry."
+  docker logout "${artifactory_docker_repo}.${artifactory_server_fqdn}" >/dev/null 2>&1 || true
+
+  if [[ ${run_status} -ne 0 ]]; then
+    _log "ERROR" "${func_name}" "docker run failed with status ${run_status}."
+    return ${run_status}
+  fi
+
+  _log "INFO" "${func_name}" "EvlSolrSlave container started successfully."
+  return 0
+}
+
+# -------------------------------------------------- START CONTAINER (public wrappers) ------------------------
+
+# @name: rt_evlsolrmaster_start_container
+# @usage: rt_evlsolrmaster_start_container $1
+# @description: Resolves Artifactory coordinates and environment variables, then calls
+#               _rt_evlsolrmaster_run_container. Called by rt_evlsolrmaster_deploy.
+# @args:
+#   $1: image_version_to_deploy  (e.g., "1.2.0-10094")
+# @return: 0 on success, non-zero on failure.
+function rt_evlsolrmaster_start_container() {
+  local func_name="rt_evlsolrmaster_start_container"
+  local image_version_to_deploy="${1}"
+
+  if [[ -z "${image_version_to_deploy}" ]]; then
+    _log "ERROR" "${func_name}" "Image version to deploy is required."
+    return 1
+  fi
+
+  local artifactory_docker_repo artifactory_server_fqdn
+  local env_name aws_region env_vars_str
+
+  artifactory_docker_repo=$(rt_evlsolr_get_artifactory_docker_repo)
+  artifactory_server_fqdn=$(rt_evlsolr_get_artifactory_server_fqdn)
+
+  env_name="$(getEnv)"
+  aws_region="${AWS_REGION:-us-east-2}"
+
+  env_vars_str="EVOLVE_INSTANCE_ENV=${env_name},AWS_REGION=${aws_region}"
+
+  _log "INFO" "${func_name}" "Starting EvlSolrMaster version ${image_version_to_deploy} in env '${env_name}'."
+
+  _rt_evlsolrmaster_run_container \
+    "${image_version_to_deploy}" \
+    "${artifactory_docker_repo}" \
+    "${artifactory_server_fqdn}" \
+    "${env_vars_str}"
+
+  local run_status=$?
+  if [[ ${run_status} -eq 0 ]]; then
+    _log "INFO" "${func_name}" "EvlSolrMaster container start initiated successfully."
+  else
+    _log "ERROR" "${func_name}" "EvlSolrMaster container start failed with status ${run_status}."
+  fi
+  return ${run_status}
+}
+
+# @name: rt_evlsolrslave_start_container
+# @usage: rt_evlsolrslave_start_container $1
+# @description: Resolves Artifactory coordinates, environment variables, and SOLR_MASTER_URL, then calls
+#               _rt_evlsolrslave_run_container. Called by rt_evlsolrslave_deploy.
+# @args:
+#   $1: image_version_to_deploy  (e.g., "1.2.0-10094")
+# @return: 0 on success, non-zero on failure.
+function rt_evlsolrslave_start_container() {
+  local func_name="rt_evlsolrslave_start_container"
+  local image_version_to_deploy="${1}"
+
+  if [[ -z "${image_version_to_deploy}" ]]; then
+    _log "ERROR" "${func_name}" "Image version to deploy is required."
+    return 1
+  fi
+
+  local artifactory_docker_repo artifactory_server_fqdn
+  local env_name aws_region solr_master_url env_vars_str
+
+  artifactory_docker_repo=$(rt_evlsolr_get_artifactory_docker_repo)
+  artifactory_server_fqdn=$(rt_evlsolr_get_artifactory_server_fqdn)
+
+  env_name="$(getEnv)"
+  aws_region="${AWS_REGION:-us-east-2}"
+
+  # SOLR_MASTER_URL: explicit env var wins; falls back to conventional internal DNS
+  # slave entrypoint also has this fallback built in, but providing it here avoids reliance on EC2 DNS
+  solr_master_url="${SOLR_MASTER_URL:-http://solr-mstr-${env_name}.ehsevolve.com/solr/evolve/replication}"
+
+  env_vars_str="EVOLVE_INSTANCE_ENV=${env_name},AWS_REGION=${aws_region},SOLR_MASTER_URL=${solr_master_url}"
+
+  _log "INFO" "${func_name}" "Starting EvlSolrSlave version ${image_version_to_deploy} in env '${env_name}'."
+  _log "INFO" "${func_name}" "Slave will replicate from: ${solr_master_url}"
+
+  _rt_evlsolrslave_run_container \
+    "${image_version_to_deploy}" \
+    "${artifactory_docker_repo}" \
+    "${artifactory_server_fqdn}" \
+    "${env_vars_str}"
+
+  local run_status=$?
+  if [[ ${run_status} -eq 0 ]]; then
+    _log "INFO" "${func_name}" "EvlSolrSlave container start initiated successfully."
+  else
+    _log "ERROR" "${func_name}" "EvlSolrSlave container start failed with status ${run_status}."
+  fi
+  return ${run_status}
+}
+
+# -------------------------------------------------- DEPLOY (public entry points) -----------------------------
+
+# @name: rt_evlsolrmaster_healthcheck
+# @usage: rt_evlsolrmaster_healthcheck
+# @description: Checks EvlSolrMaster health via /admin/ping.
+# @stdout: "HEALTHY" or "UNHEALTHY"
+function rt_evlsolrmaster_healthcheck() {
+  local response_code
+  response_code=$(curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8081/solr/evolve/admin/ping?wt=json')
+  if [[ "${response_code}" == "200" ]]; then
+    echo "HEALTHY"
+  else
+    echo "UNHEALTHY"
+  fi
+}
+
+# @name: rt_evlsolrslave_healthcheck
+# @usage: rt_evlsolrslave_healthcheck
+# @description: Checks EvlSolrSlave health via /admin/ping (slave also listens on 8081 inside container).
+# @stdout: "HEALTHY" or "UNHEALTHY"
+function rt_evlsolrslave_healthcheck() {
+  local response_code
+  response_code=$(curl -s -o /dev/null -w '%{http_code}' 'http://localhost:8081/solr/evolve/admin/ping?wt=json')
+  if [[ "${response_code}" == "200" ]]; then
+    echo "HEALTHY"
+  else
+    echo "UNHEALTHY"
+  fi
+}
+
+# @name: rt_evlsolrmaster_get_container_version
+# @usage: rt_evlsolrmaster_get_container_version
+# @description: Returns the image tag of the currently running EvlSolrMaster container.
+# @stdout: Tag string, or empty if not found.
+function rt_evlsolrmaster_get_container_version() {
+  local container_name="evolve-solr-master"
+  if docker ps --format "{{.Names}}" | grep -q "^${container_name}$"; then
+    docker inspect --format="{{.Config.Image}}" "${container_name}" 2>/dev/null | cut -d: -f2
+  fi
+}
+
+# @name: rt_evlsolrslave_get_container_version
+# @usage: rt_evlsolrslave_get_container_version
+# @description: Returns the image tag of the currently running EvlSolrSlave container.
+# @stdout: Tag string, or empty if not found.
+function rt_evlsolrslave_get_container_version() {
+  local container_name="evolve-solr-slave"
+  if docker ps --format "{{.Names}}" | grep -q "^${container_name}$"; then
+    docker inspect --format="{{.Config.Image}}" "${container_name}" 2>/dev/null | cut -d: -f2
+  fi
+}
+
+# @name: rt_evlsolrmaster_deploy
+# @usage: rt_evlsolrmaster_deploy $1
+# @description: Orchestrates EvlSolrMaster deployment. Deploys target version, health-checks,
+#               rolls back to ':stable' on failure, updates EC2 tag on success.
+#               Entry point for Jenkins post-build step and EC2 userdata.
+# @args:
+#   $1: target_version  (e.g., "1.2.0-10094") — the versioned image tag pushed to Artifactory by CI
+# @return: 0 on success, 1 on failure (including failed rollback).
+function rt_evlsolrmaster_deploy() {
+  local func_name="rt_evlsolrmaster_deploy"
+  local target_version="${1}"
+
+  local default_sleep_timeout=90    # Start-period matches Dockerfile HEALTHCHECK --start-period=90s
+  local MAX_HEALTH_CHECK_RETRIES=20
+  local HEALTH_CHECK_INTERVAL=10
+
+  local app_tag="EvlSolrMaster"     # EC2 tag key
+  local RED='\033[1;31m'; local GREEN='\033[1;32m'; local NC='\033[0m'
+
+  if [[ -z "${target_version}" ]]; then
+    _log "ERROR" "${func_name}" "Target version (e.g., '1.2.0-10094') is required."
+    return 1
+  fi
+
+  _log "INFO" "${func_name}" "Starting EvlSolrMaster deployment for version: ${target_version}"
+
+  rt_evlsolrmaster_start_container "${target_version}"
+  local deploy_status=$?
+
+  if [[ ${deploy_status} -ne 0 ]]; then
+    _log "ERROR" "${func_name}" "Start command for EvlSolrMaster ${target_version} failed. Proceeding to rollback."
+  else
+    _log "INFO" "${func_name}" "EvlSolrMaster ${target_version} started. Waiting ${default_sleep_timeout}s for Solr to initialize..."
+    sleep "${default_sleep_timeout}"
+
+    local attempt_num=0
+    while [[ ${attempt_num} -lt ${MAX_HEALTH_CHECK_RETRIES} ]]; do
+      attempt_num=$((attempt_num + 1))
+      _log "INFO" "${func_name}" "Health check attempt ${attempt_num}/${MAX_HEALTH_CHECK_RETRIES}..."
+      if [[ "$(rt_evlsolrmaster_healthcheck)" == "HEALTHY" ]]; then
+        _log "INFO" "${func_name}" "${GREEN}EvlSolrMaster ${target_version} is HEALTHY.${NC}"
+        local live_version
+        live_version=$(rt_evlsolrmaster_get_container_version)
+        [[ -z "${live_version}" ]] && live_version="${target_version}"
+        _log "INFO" "${func_name}" "Updating EC2 tag '${app_tag}' to 'evlsolrmaster:${live_version}'"
+        setMyTag "${app_tag}" "evlsolrmaster:${live_version}"
+        _log "INFO" "${func_name}" "EvlSolrMaster deployment of ${target_version} successful."
+        return 0
+      fi
+      _log "WARN" "${func_name}" "Health check failed. Retrying in ${HEALTH_CHECK_INTERVAL}s..."
+      sleep "${HEALTH_CHECK_INTERVAL}"
+    done
+    _log "ERROR" "${func_name}" "EvlSolrMaster ${target_version} failed all ${MAX_HEALTH_CHECK_RETRIES} health checks."
+  fi
+
+  # Rollback to :stable
+  _log "ERROR" "${func_name}" "${RED}Deployment of ${target_version} FAILED.${NC} Rolling back to ':stable'."
+  local container_logs
+  container_logs=$(docker logs --tail 50 evolve-solr-master 2>&1 || true)
+  _log "ERROR" "${func_name}" "Logs from failed deployment:\n${container_logs}"
+
+  rt_evlsolrmaster_start_container "stable"
+  local rollback_status=$?
+
+  if [[ ${rollback_status} -ne 0 ]]; then
+    _log "ERROR" "${func_name}" "${RED}Rollback to ':stable' FAILED.${NC}"
+    return 1
+  fi
+
+  _log "INFO" "${func_name}" "Rollback to ':stable' started. Waiting ${default_sleep_timeout}s..."
+  sleep "${default_sleep_timeout}"
+
+  local rb_attempt=0
+  while [[ ${rb_attempt} -lt ${MAX_HEALTH_CHECK_RETRIES} ]]; do
+    rb_attempt=$((rb_attempt + 1))
+    if [[ "$(rt_evlsolrmaster_healthcheck)" == "HEALTHY" ]]; then
+      _log "INFO" "${func_name}" "${GREEN}Rollback to ':stable' is HEALTHY.${NC}"
+      setMyTag "${app_tag}" "evlsolrmaster:stable"
+      _log "WARN" "${func_name}" "Original deployment of ${target_version} failed; rollback to :stable succeeded."
+      return 1
+    fi
+    sleep "${HEALTH_CHECK_INTERVAL}"
+  done
+
+  _log "ERROR" "${func_name}" "${RED}Rollback to ':stable' also failed all health checks.${NC}"
+  return 1
+}
+
+# @name: rt_evlsolrslave_deploy
+# @usage: rt_evlsolrslave_deploy $1
+# @description: Orchestrates EvlSolrSlave deployment. Identical flow to rt_evlsolrmaster_deploy.
+#               Entry point for Jenkins post-build step and EC2 userdata.
+# @args:
+#   $1: target_version  (e.g., "1.2.0-10094")
+# @return: 0 on success, 1 on failure (including failed rollback).
+function rt_evlsolrslave_deploy() {
+  local func_name="rt_evlsolrslave_deploy"
+  local target_version="${1}"
+
+  local default_sleep_timeout=90
+  local MAX_HEALTH_CHECK_RETRIES=20
+  local HEALTH_CHECK_INTERVAL=10
+
+  local app_tag="EvlSolrSlave"
+  local RED='\033[1;31m'; local GREEN='\033[1;32m'; local NC='\033[0m'
+
+  if [[ -z "${target_version}" ]]; then
+    _log "ERROR" "${func_name}" "Target version (e.g., '1.2.0-10094') is required."
+    return 1
+  fi
+
+  _log "INFO" "${func_name}" "Starting EvlSolrSlave deployment for version: ${target_version}"
+
+  rt_evlsolrslave_start_container "${target_version}"
+  local deploy_status=$?
+
+  if [[ ${deploy_status} -ne 0 ]]; then
+    _log "ERROR" "${func_name}" "Start command for EvlSolrSlave ${target_version} failed. Proceeding to rollback."
+  else
+    _log "INFO" "${func_name}" "EvlSolrSlave ${target_version} started. Waiting ${default_sleep_timeout}s for Solr to initialize..."
+    sleep "${default_sleep_timeout}"
+
+    local attempt_num=0
+    while [[ ${attempt_num} -lt ${MAX_HEALTH_CHECK_RETRIES} ]]; do
+      attempt_num=$((attempt_num + 1))
+      _log "INFO" "${func_name}" "Health check attempt ${attempt_num}/${MAX_HEALTH_CHECK_RETRIES}..."
+      if [[ "$(rt_evlsolrslave_healthcheck)" == "HEALTHY" ]]; then
+        _log "INFO" "${func_name}" "${GREEN}EvlSolrSlave ${target_version} is HEALTHY.${NC}"
+        local live_version
+        live_version=$(rt_evlsolrslave_get_container_version)
+        [[ -z "${live_version}" ]] && live_version="${target_version}"
+        _log "INFO" "${func_name}" "Updating EC2 tag '${app_tag}' to 'evlsolrslave:${live_version}'"
+        setMyTag "${app_tag}" "evlsolrslave:${live_version}"
+        _log "INFO" "${func_name}" "EvlSolrSlave deployment of ${target_version} successful."
+        return 0
+      fi
+      _log "WARN" "${func_name}" "Health check failed. Retrying in ${HEALTH_CHECK_INTERVAL}s..."
+      sleep "${HEALTH_CHECK_INTERVAL}"
+    done
+    _log "ERROR" "${func_name}" "EvlSolrSlave ${target_version} failed all ${MAX_HEALTH_CHECK_RETRIES} health checks."
+  fi
+
+  # Rollback to :stable
+  _log "ERROR" "${func_name}" "${RED}Deployment of ${target_version} FAILED.${NC} Rolling back to ':stable'."
+  local container_logs
+  container_logs=$(docker logs --tail 50 evolve-solr-slave 2>&1 || true)
+  _log "ERROR" "${func_name}" "Logs from failed deployment:\n${container_logs}"
+
+  rt_evlsolrslave_start_container "stable"
+  local rollback_status=$?
+
+  if [[ ${rollback_status} -ne 0 ]]; then
+    _log "ERROR" "${func_name}" "${RED}Rollback to ':stable' FAILED.${NC}"
+    return 1
+  fi
+
+  _log "INFO" "${func_name}" "Rollback to ':stable' started. Waiting ${default_sleep_timeout}s..."
+  sleep "${default_sleep_timeout}"
+
+  local rb_attempt=0
+  while [[ ${rb_attempt} -lt ${MAX_HEALTH_CHECK_RETRIES} ]]; do
+    rb_attempt=$((rb_attempt + 1))
+    if [[ "$(rt_evlsolrslave_healthcheck)" == "HEALTHY" ]]; then
+      _log "INFO" "${func_name}" "${GREEN}Rollback to ':stable' is HEALTHY.${NC}"
+      setMyTag "${app_tag}" "evlsolrslave:stable"
+      _log "WARN" "${func_name}" "Original deployment of ${target_version} failed; rollback to :stable succeeded."
+      return 1
+    fi
+    sleep "${HEALTH_CHECK_INTERVAL}"
+  done
+
+  _log "ERROR" "${func_name}" "${RED}Rollback to ':stable' also failed all health checks.${NC}"
+  return 1
+}
+
+#######################################################################################
+### END of EvlSolr Container Deployment Functions
+#######################################################################################

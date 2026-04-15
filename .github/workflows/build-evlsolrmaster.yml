@@ -1,0 +1,343 @@
+name: Build EvlSolrMaster
+
+# Ticket: 1.D.11 — Application Image Build & Rotate (EvlSolrMaster)
+#
+# Tier 2 — Application Image Build pipeline per org spec:
+#   Job 1 (binary-build):    Ant build → Trivy scan → artifact to Artifactory
+#   Job 2 (container-build): Pull artifact from Artifactory → Docker build
+#                             → push Artifactory + ECR
+#   Job 3 (cortex-pr):       Open PR on Cortex Control Repo with new image tag
+#
+# Triggers:
+#   - Push to main/NHETIO-4421_Docker on relevant source paths
+#   - Pull request (binary-build + scan only; no push)
+#   - repository_dispatch(baseline-updated) from build-baseline.yml
+#   - workflow_dispatch with version + environment inputs
+#
+# Required secrets (repo or org level):
+#   ARTIFACTORY_USER        — Artifactory service account username
+#   ARTIFACTORY_TOKEN       — Artifactory API token (read + write)
+#   AWS_ECR_ROLE_ARN        — IAM Role ARN for OIDC-based ECR push
+#   CORTEX_REPO_TOKEN       — GitHub PAT with write access to the Cortex Control Repo
+#
+# Required variables:
+#   ECR_ACCOUNT_ID          — AWS account hosting ECR  (e.g. 167920276477)
+#   ECR_REGION              — AWS region               (e.g. us-east-2)
+#   CORTEX_CONTROL_REPO     — org/repo of Cortex Control Repo (e.g. myorg/cortex-control)
+
+on:
+  push:
+    branches:
+      - main
+      - NHETIO-4421_Docker
+    paths:
+      - 'vobs/EvolveEcom/Solr/master/**'
+      - 'vobs/EvolveEcom/Solr/build/**'
+      - 'vobs/EvolveEcom/Solr/setup/**'
+      - 'master/Dockerfile'
+      - 'master/docker-entrypoint.sh'
+      - 'tio-utils.sh'
+  pull_request:
+    paths:
+      - 'vobs/EvolveEcom/Solr/master/**'
+      - 'vobs/EvolveEcom/Solr/build/**'
+      - 'vobs/EvolveEcom/Solr/setup/**'
+      - 'master/Dockerfile'
+      - 'master/docker-entrypoint.sh'
+      - 'tio-utils.sh'
+  repository_dispatch:
+    types: [baseline-updated]   # fired by build-baseline.yml on new TIO base image
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+      environment:
+        description: 'Solr environment for Docker config layer'
+        required: false
+        type: choice
+        options: [dev, cert, stage, prod]
+        default: dev
+
+env:
+  ARTIFACTORY_REGISTRY: docker-eols-cijenkins-local.health.artifactory.tio.systems
+  ARTIFACTORY_GENERIC: https://health.artifactory.tio.systems/artifactory
+  ARTIFACTORY_BINARY_REPO: generic-evolve-services-dev-local
+  ARTIFACTORY_DOCKER_REPO: eols
+  APP_NAME: EvlSolrMaster
+  IMAGE_SLUG: evlsolrmaster
+  AWS_REGION: ${{ vars.ECR_REGION || 'us-east-2' }}
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 1 — Binary Build
+  # Spec: checks out code, builds binary artifact, tests & scans, uploads to Artifactory
+  # ─────────────────────────────────────────────────────────────────────────────
+  binary-build:
+    name: Binary build & scan (EvlSolrMaster)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_id: ${{ steps.version.outputs.release_id }}
+      artifact_url: ${{ steps.upload.outputs.artifact_url }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Resolve version and release ID
+        id: version
+        run: |
+          VER="${{ inputs.version || '1.0.0' }}"
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "release_id=${APP_NAME}-${VER}-${{ github.run_number }}" >> "$GITHUB_OUTPUT"
+
+      # 3c. Build binary artifact
+      - name: Ant tar — build release unit
+        env:
+          PROJECT_VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: ant -f vobs/EvolveEcom/Solr/master/build/build.xml tar
+
+      # 3d. Automated testing & security scanning
+      - name: Trivy filesystem scan (CRITICAL CVEs → abort)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: vobs/EvolveEcom/Solr
+          format: table
+          exit-code: '1'
+          severity: CRITICAL
+
+      # Retain artifact in GHA for the container-build job (cross-job handoff)
+      - name: Stage artifact for container-build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.release_id }}
+          path: vobs/EvolveEcom/Solr/build/releases/${{ steps.version.outputs.release_id }}.tar
+          retention-days: 1     # short TTL — Artifactory is the durable store
+
+      # 3f. Check artifact into Artifactory (skipped on pull_request)
+      - name: Upload binary artifact to Artifactory
+        id: upload
+        if: github.event_name != 'pull_request'
+        env:
+          VER: ${{ steps.version.outputs.version }}
+          RELEASE_ID: ${{ steps.version.outputs.release_id }}
+        run: |
+          ARTIFACT_PATH="${ARTIFACTORY_BINARY_REPO}/EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
+          ARTIFACT_URL="${ARTIFACTORY_GENERIC}/${ARTIFACT_PATH}"
+
+          curl -fSL -u "${{ secrets.ARTIFACTORY_USER }}:${{ secrets.ARTIFACTORY_TOKEN }}" \
+            -T "vobs/EvolveEcom/Solr/build/releases/${RELEASE_ID}.tar" \
+            "${ARTIFACT_URL}"
+
+          echo "artifact_url=${ARTIFACT_URL}" >> "$GITHUB_OUTPUT"
+          echo "Published binary: ${ARTIFACT_URL}"
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 2 — Container Build
+  # Spec: pulls binary from Artifactory, builds immutable container,
+  #       pushes to Artifactory (Docker) + ECR
+  # Skipped on pull_request (no push credentials from fork runners)
+  # ─────────────────────────────────────────────────────────────────────────────
+  container-build:
+    name: Container build & push (EvlSolrMaster)
+    runs-on: ubuntu-latest
+    needs: binary-build
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      id-token: write    # required for OIDC → AWS ECR
+    outputs:
+      image_tag: ${{ steps.tags.outputs.image_tag }}
+      ecr_image: ${{ steps.tags.outputs.ecr_image }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # 4a. Pull latest binary artifact — prefer Artifactory; fall back to GHA artifact
+      - name: Download binary artifact (GHA handoff)
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.binary-build.outputs.release_id }}
+          path: /tmp/release
+
+      - name: Resolve image tags
+        id: tags
+        env:
+          VERSION: ${{ needs.binary-build.outputs.version }}
+          ENV: ${{ inputs.environment || 'dev' }}
+        run: |
+          IMAGE_TAG="${VERSION}-${{ github.run_number }}"
+          ARTIFACTORY_IMAGE="${ARTIFACTORY_REGISTRY}/${ARTIFACTORY_DOCKER_REPO}/${IMAGE_SLUG}"
+          ECR_IMAGE="${{ vars.ECR_ACCOUNT_ID }}.dkr.ecr.${AWS_REGION}.amazonaws.com/${IMAGE_SLUG}"
+
+          echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "env_tag=${ENV}-latest"  >> "$GITHUB_OUTPUT"
+          echo "artifactory_image=${ARTIFACTORY_IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "ecr_image=${ECR_IMAGE}" >> "$GITHUB_OUTPUT"
+
+      # Cache the New Relic Java agent (~10 MB); license key injected at runtime.
+      - name: Cache New Relic Java agent
+        id: nr-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/nr-cache/newrelic-java.zip
+          key: newrelic-java-agent-v1
+
+      - name: Download New Relic Java agent
+        if: steps.nr-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /tmp/nr-cache
+          curl -fSL -o /tmp/nr-cache/newrelic-java.zip \
+            "https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic-java.zip"
+
+      - name: Stage per-env config TGZ and start HTTP server
+        env:
+          ENV: ${{ inputs.environment || 'dev' }}
+        run: |
+          mkdir -p /tmp/stubs
+          # 4b-i. Pack env-specific Solr configset — COPYed into the container
+          tar -czf "/tmp/stubs/${APP_NAME}-${ENV}.tgz" \
+            -C "vobs/EvolveEcom/Solr/master/${ENV}" conf/
+          cp /tmp/nr-cache/newrelic-java.zip /tmp/stubs/
+          # Serve over localhost:8000; docker build --network=host reaches it
+          python3 -m http.server 8000 --directory /tmp/stubs &
+          sleep 2
+          curl -sSI "http://localhost:8000/${APP_NAME}-${ENV}.tgz" | grep -E 'HTTP|Content-Length'
+          curl -sSI "http://localhost:8000/newrelic-java.zip"       | grep -E 'HTTP|Content-Length'
+
+      # ── Registry logins ───────────────────────────────────────────────────
+      - name: Log in to Artifactory (Docker)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ARTIFACTORY_REGISTRY }}
+          username: ${{ secrets.ARTIFACTORY_USER }}
+          password: ${{ secrets.ARTIFACTORY_TOKEN }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── 4b. Build immutable container ─────────────────────────────────────
+      # COPY binary artifact + entrypoint.sh happen inside the Dockerfile.
+      - name: Docker build
+        env:
+          ENV: ${{ inputs.environment || 'dev' }}
+          VERSION: ${{ needs.binary-build.outputs.version }}
+          IMAGE_TAG: ${{ steps.tags.outputs.image_tag }}
+          ENV_TAG: ${{ steps.tags.outputs.env_tag }}
+          ARTIFACTORY_IMAGE: ${{ steps.tags.outputs.artifactory_image }}
+          ECR_IMAGE: ${{ steps.tags.outputs.ecr_image }}
+        run: |
+          docker build --network=host \
+            -f master/Dockerfile \
+            --build-arg EVLSOLRMASTER_ARTIFACT_URL="http://localhost:8000/${APP_NAME}-${ENV}.tgz" \
+            --build-arg NR_ARTIFACT_URL="http://localhost:8000/newrelic-java.zip" \
+            -t "${ARTIFACTORY_IMAGE}:${IMAGE_TAG}" \
+            -t "${ARTIFACTORY_IMAGE}:${ENV_TAG}" \
+            -t "${ECR_IMAGE}:${IMAGE_TAG}" \
+            -t "${ECR_IMAGE}:${ENV_TAG}" \
+            .
+
+      # ── Scan container image before pushing ───────────────────────────────
+      - name: Trivy image scan (CRITICAL CVEs → abort)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.tags.outputs.artifactory_image }}:${{ steps.tags.outputs.image_tag }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL
+
+      # ── 4c. Push to Artifactory (Docker) ──────────────────────────────────
+      - name: Push to Artifactory
+        env:
+          ARTIFACTORY_IMAGE: ${{ steps.tags.outputs.artifactory_image }}
+        run: docker push "${ARTIFACTORY_IMAGE}" --all-tags
+
+      # ── 4d. Push to ECR ───────────────────────────────────────────────────
+      - name: Push to ECR
+        env:
+          ECR_IMAGE: ${{ steps.tags.outputs.ecr_image }}
+        run: docker push "${ECR_IMAGE}" --all-tags
+
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 3 — Cortex Control Repo PR
+  # Spec step 4e: creates a PR to update the Cortex Control Repo with the new
+  # container image tag, so a human (step 5) can approve and Cortex can schedule
+  # the new container (step 6).
+  # ─────────────────────────────────────────────────────────────────────────────
+  cortex-pr:
+    name: Open Cortex Control Repo PR (EvlSolrMaster)
+    runs-on: ubuntu-latest
+    needs: container-build
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout Cortex Control Repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.CORTEX_CONTROL_REPO }}
+          token: ${{ secrets.CORTEX_REPO_TOKEN }}
+          path: cortex-control
+
+      - name: Update image tag in Cortex Control Repo
+        env:
+          IMAGE_TAG: ${{ needs.container-build.outputs.image_tag }}
+          ECR_IMAGE: ${{ needs.container-build.outputs.ecr_image }}
+          ENV: ${{ inputs.environment || 'dev' }}
+          BRANCH: evlsolrmaster-${{ github.run_number }}
+        run: |
+          cd cortex-control
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "${BRANCH}"
+
+          # Update the image tag — adjust the sed target to match your Cortex manifest path
+          IMAGE_FILE="environments/${ENV}/evlsolrmaster/image.yaml"
+          if [[ -f "${IMAGE_FILE}" ]]; then
+            sed -i "s|tag:.*|tag: \"${IMAGE_TAG}\"|" "${IMAGE_FILE}"
+            sed -i "s|repository:.*|repository: \"${ECR_IMAGE}\"|" "${IMAGE_FILE}"
+          else
+            # Fallback: create a minimal image reference file
+            mkdir -p "$(dirname "${IMAGE_FILE}")"
+            printf 'repository: "%s"\ntag: "%s"\n' "${ECR_IMAGE}" "${IMAGE_TAG}" > "${IMAGE_FILE}"
+          fi
+
+          git add "${IMAGE_FILE}"
+          git commit -m "chore(evlsolrmaster): bump image to ${IMAGE_TAG} [run ${{ github.run_number }}]"
+          git push origin "${BRANCH}"
+
+      - name: Create pull request
+        env:
+          GH_TOKEN: ${{ secrets.CORTEX_REPO_TOKEN }}
+          BRANCH: evlsolrmaster-${{ github.run_number }}
+          IMAGE_TAG: ${{ needs.container-build.outputs.image_tag }}
+          ECR_IMAGE: ${{ needs.container-build.outputs.ecr_image }}
+        run: |
+          gh pr create \
+            --repo "${{ vars.CORTEX_CONTROL_REPO }}" \
+            --base main \
+            --head "${BRANCH}" \
+            --title "chore(evlsolrmaster): deploy ${IMAGE_TAG}" \
+            --body "## EvlSolrMaster — new container ready for Cortex
+
+          **Image:** \`${ECR_IMAGE}:${IMAGE_TAG}\`
+          **Source run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          **Environment:** ${{ inputs.environment || 'dev' }}
+
+          Approve to schedule deployment via Cortex."
