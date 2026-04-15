@@ -187,34 +187,18 @@ jobs:
           echo "ecr_image=${ECR_IMAGE}" >> "$GITHUB_OUTPUT"
 
       # Cache the New Relic Java agent (~10 MB); license key injected at runtime.
-      - name: Cache New Relic Java agent
-        id: nr-cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/nr-cache/newrelic-java.zip
-          key: newrelic-java-agent-v1
-
-      - name: Download New Relic Java agent
-        if: steps.nr-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p /tmp/nr-cache
-          curl -fSL -o /tmp/nr-cache/newrelic-java.zip \
-            "https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic-java.zip"
-
       - name: Stage per-env config TGZ and start HTTP server
         env:
           ENV: ${{ inputs.environment || 'dev' }}
         run: |
           mkdir -p /tmp/stubs
-          # 4b-i. Pack env-specific Solr configset — COPYed into the container
+          # Pack env-specific Solr configset — extracted into the container by Dockerfile step 6
           tar -czf "/tmp/stubs/${APP_NAME}-${ENV}.tgz" \
             -C "vobs/EvolveEcom/Solr/master/${ENV}" conf/
-          cp /tmp/nr-cache/newrelic-java.zip /tmp/stubs/
           # Serve over localhost:8000; docker build --network=host reaches it
           python3 -m http.server 8000 --directory /tmp/stubs &
           sleep 2
           curl -sSI "http://localhost:8000/${APP_NAME}-${ENV}.tgz" | grep -E 'HTTP|Content-Length'
-          curl -sSI "http://localhost:8000/newrelic-java.zip"       | grep -E 'HTTP|Content-Length'
 
       # ── Registry logins ───────────────────────────────────────────────────
       - name: Log in to Artifactory (Docker)
@@ -247,7 +231,6 @@ jobs:
           docker build --network=host \
             -f master/Dockerfile \
             --build-arg EVLSOLRMASTER_ARTIFACT_URL="http://localhost:8000/${APP_NAME}-${ENV}.tgz" \
-            --build-arg NR_ARTIFACT_URL="http://localhost:8000/newrelic-java.zip" \
             -t "${ARTIFACTORY_IMAGE}:${IMAGE_TAG}" \
             -t "${ARTIFACTORY_IMAGE}:${ENV_TAG}" \
             -t "${ECR_IMAGE}:${IMAGE_TAG}" \

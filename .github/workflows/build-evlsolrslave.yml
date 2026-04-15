@@ -187,34 +187,18 @@ jobs:
           echo "ecr_image=${ECR_IMAGE}" >> "$GITHUB_OUTPUT"
 
       # Cache the New Relic Java agent (~10 MB); license key injected at runtime.
-      - name: Cache New Relic Java agent
-        id: nr-cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/nr-cache/newrelic-java.zip
-          key: newrelic-java-agent-v1
-
-      - name: Download New Relic Java agent
-        if: steps.nr-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p /tmp/nr-cache
-          curl -fSL -o /tmp/nr-cache/newrelic-java.zip \
-            "https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic-java.zip"
-
       - name: Stage per-env config TGZ and start HTTP server
         env:
           ENV: ${{ inputs.environment || 'dev' }}
         run: |
           mkdir -p /tmp/stubs
-          # 4b-i. Pack env-specific Solr configset — COPYed into the container
+          # Pack env-specific Solr configset — extracted into the container by Dockerfile step 6
           tar -czf "/tmp/stubs/${APP_NAME}-${ENV}.tgz" \
             -C "vobs/EvolveEcom/Solr/slave/${ENV}" conf/
-          cp /tmp/nr-cache/newrelic-java.zip /tmp/stubs/
           # Serve over localhost:8000; docker build --network=host reaches it
           python3 -m http.server 8000 --directory /tmp/stubs &
           sleep 2
           curl -sSI "http://localhost:8000/${APP_NAME}-${ENV}.tgz" | grep -E 'HTTP|Content-Length'
-          curl -sSI "http://localhost:8000/newrelic-java.zip"       | grep -E 'HTTP|Content-Length'
 
       # ── Registry logins ───────────────────────────────────────────────────
       - name: Log in to Artifactory (Docker)
@@ -247,7 +231,6 @@ jobs:
           docker build --network=host \
             -f slave/Dockerfile \
             --build-arg EVLSOLRSLAVE_ARTIFACT_URL="http://localhost:8000/${APP_NAME}-${ENV}.tgz" \
-            --build-arg NR_ARTIFACT_URL="http://localhost:8000/newrelic-java.zip" \
             -t "${ARTIFACTORY_IMAGE}:${IMAGE_TAG}" \
             -t "${ARTIFACTORY_IMAGE}:${ENV_TAG}" \
             -t "${ECR_IMAGE}:${IMAGE_TAG}" \
@@ -439,22 +422,6 @@ jobs:
           name: ${{ needs.ant-build.outputs.release_id }}
           path: /tmp/release
 
-      # Cache the New Relic Java agent zip (~10 MB) to avoid repeated downloads.
-      # License key is NOT baked into the image; it is injected at runtime by docker-entrypoint.sh.
-      - name: Cache New Relic Java agent
-        id: nr-cache
-        uses: actions/cache@v4
-        with:
-          path: /tmp/nr-cache/newrelic-java.zip
-          key: newrelic-java-agent-v1
-
-      - name: Download New Relic Java agent
-        if: steps.nr-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p /tmp/nr-cache
-          curl -fSL -o /tmp/nr-cache/newrelic-java.zip \
-            "https://download.newrelic.com/newrelic/java-agent/newrelic-agent/current/newrelic-java.zip"
-
       - name: Stage artifacts and start local HTTP server
         env:
           ENV: ${{ inputs.environment || 'dev' }}
@@ -466,9 +433,6 @@ jobs:
           tar -czf "/tmp/stubs/EvlSolrSlave-${ENV}.tgz" \
             -C "vobs/EvolveEcom/Solr/slave/${ENV}" conf/
 
-          # Stage the New Relic agent zip
-          cp /tmp/nr-cache/newrelic-java.zip /tmp/stubs/
-
           # Start HTTP server on localhost:8000.
           # docker build uses --network=host so the build container can reach localhost.
           python3 -m http.server 8000 --directory /tmp/stubs &
@@ -476,7 +440,6 @@ jobs:
 
           echo "Stub server contents:"
           curl -sSI "http://localhost:8000/EvlSolrSlave-${ENV}.tgz" | grep -E 'HTTP|Content-Length'
-          curl -sSI "http://localhost:8000/newrelic-java.zip"        | grep -E 'HTTP|Content-Length'
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -496,7 +459,6 @@ jobs:
           docker build --network=host \
             -f slave/Dockerfile \
             --build-arg EVLSOLRSLAVE_ARTIFACT_URL="http://localhost:8000/EvlSolrSlave-${ENV}.tgz" \
-            --build-arg NR_ARTIFACT_URL="http://localhost:8000/newrelic-java.zip" \
             -t "${IMAGE}:${VERSION}-${{ github.run_number }}" \
             -t "${IMAGE}:${ENV}-latest" \
             .

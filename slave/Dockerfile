@@ -8,7 +8,8 @@
 #
 # Required build args (--build-arg):
 #   EVLSOLRSLAVE_ARTIFACT_URL  Artifactory URL for EvlSolrSlave-<version>.tgz
-#   NR_ARTIFACT_URL            URL for newrelic-java.zip
+#   NR_VERSION                  New Relic Java agent version (default: 8.20.0)
+#   NR_ARTIFACT_URL            Artifactory maven-central-remote URL for newrelic-java.zip (default set; override to pin a different version)
 
 # Core Engineering hardened AL2023 Java 8 image (account 702267635140) — replaces public amazoncorretto upstream
 FROM docker-eols-cijenkins-local.health.artifactory.tio.systems/eols/tio-al2023-java8:1.0.0
@@ -21,14 +22,21 @@ LABEL org.opencontainers.image.vendor="Elsevier" \
       org.opencontainers.image.licenses="Proprietary"
 
 ARG SOLR_VERSION=8.11.2
+# SHA512 of the official Apache Solr 8.11.2 tarball — set to empty to skip (e.g. local stub builds)
+ARG SOLR_SHA512="22fedcc0090eda72c3c5a5ea769c93adaf7d92c5c4479993f009ef0b9d42de5bd2ed1e0565ca01f3428587d8a3836286aa3017aab157050f2bd5bc3482fdebaa"
 # Local dev overrides (leave unset in CI/prod)
 ARG SOLR_DOWNLOAD_URL="https://archive.apache.org/dist/lucene/solr/${SOLR_VERSION}/solr-${SOLR_VERSION}.tgz"
 ARG CURL_OPTS=""
 ARG DNF_SSLVERIFY=True
 
-# Artifactory artifact URLs — passed via --build-arg in CI
+# New Relic Java agent — internal Artifactory proxy of Maven Central (pinned version)
+# Override with --build-arg NR_VERSION=x.y.z to change version; set NR_SHA256="" to skip verification
+ARG NR_VERSION=8.20.0
+ARG NR_SHA256="7a02e115ce945843fab71b5ae155bef80733d80e000ab3c3f51df36422281bdf"
+ARG NR_ARTIFACT_URL="https://health.artifactory.tio.systems/artifactory/maven-central-remote/com/newrelic/agent/java/newrelic-java/${NR_VERSION}/newrelic-java-${NR_VERSION}.zip"
+
+# Artifactory artifact URL — passed via --build-arg in CI
 ARG EVLSOLRSLAVE_ARTIFACT_URL
-ARG NR_ARTIFACT_URL
 
 # 1. Runtime packages — mirrors: packer/solr.pkr.hcl dnf install step
 RUN echo "sslverify=${DNF_SSLVERIFY}" >> /etc/dnf/dnf.conf \
@@ -55,6 +63,9 @@ RUN mkdir -p \
 RUN curl ${CURL_OPTS} -fSL \
       "${SOLR_DOWNLOAD_URL}" \
       -o /opt/tio/solr-${SOLR_VERSION}.tgz \
+    && if [ -n "${SOLR_SHA512}" ]; then \
+         echo "${SOLR_SHA512}  /opt/tio/solr-${SOLR_VERSION}.tgz" | sha512sum -c -; \
+       fi \
     && tar -xzf /opt/tio/solr-${SOLR_VERSION}.tgz -C /opt/solr/ \
     && ln -s /opt/solr/solr-${SOLR_VERSION} /opt/solr/current \
     && mkdir -p /opt/solr/current/logs \
@@ -108,11 +119,14 @@ RUN if ! grep -q "solr.disable.shardsWhitelist=true" /etc/default/solr.in.sh; th
         >> /etc/default/solr.in.sh; \
     fi
 
-# 9. New Relic agent — fetched at build time via NR_ARTIFACT_URL build arg.
+# 9. New Relic agent — pulled from Artifactory maven-central proxy (NR_VERSION pinned).
 # License key is NOT baked in; it is injected at runtime by docker-entrypoint.sh.
 RUN curl ${CURL_OPTS} -fSL \
       "${NR_ARTIFACT_URL}" \
       -o /opt/newrelic/newrelic-java.zip \
+    && if [ -n "${NR_SHA256}" ]; then \
+         echo "${NR_SHA256}  /opt/newrelic/newrelic-java.zip" | sha256sum -c -; \
+       fi \
     && unzip -q /opt/newrelic/newrelic-java.zip -d /opt/newrelic/ \
     && cp -rf /opt/newrelic/newrelic /opt/solr/current/newrelic \
     && rm -rf /opt/newrelic
