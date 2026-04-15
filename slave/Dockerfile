@@ -103,6 +103,7 @@ RUN curl ${CURL_OPTS} -fSL \
 RUN echo "name=evolve" > /opt/solr/current/server/solr/evolve/core.properties
 
 # 7. solr.in.sh — replaces: install_solr_service.sh (skipped; registers init.d/systemd)
+# bin/solr sources bin/solr.in.sh FIRST (before /etc/default/solr.in.sh), so we write there.
 RUN cp /opt/solr/current/server/resources/log4j2.xml /var/solr/ \
     && printf '%s\n' \
          'SOLR_HOME="/opt/solr/current/server/solr"' \
@@ -111,11 +112,14 @@ RUN cp /opt/solr/current/server/resources/log4j2.xml /var/solr/ \
          'LOG4J_PROPS="/var/solr/log4j2.xml"' \
          'SOLR_PORT="8081"' \
          'RUNAS="evolve"' \
-       > /etc/default/solr.in.sh
+       >> /opt/solr/current/bin/solr.in.sh \
+    && cp /opt/solr/current/bin/solr.in.sh /etc/default/solr.in.sh
 
 # 8. shardsWhitelist (Slave only) — mirrors: install_latest_solr.sh lines 156-163
-RUN if ! grep -q "solr.disable.shardsWhitelist=true" /etc/default/solr.in.sh; then \
+RUN if ! grep -q "solr.disable.shardsWhitelist=true" /opt/solr/current/bin/solr.in.sh; then \
       echo 'SOLR_OPTS="$SOLR_OPTS -Dsolr.disable.shardsWhitelist=true"' \
+        >> /opt/solr/current/bin/solr.in.sh \
+      && echo 'SOLR_OPTS="$SOLR_OPTS -Dsolr.disable.shardsWhitelist=true"' \
         >> /etc/default/solr.in.sh; \
     fi
 

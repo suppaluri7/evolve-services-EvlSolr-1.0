@@ -6,7 +6,7 @@
 # IAM: ssm:GetParameter on /evolve/{env}/solr and secretsmanager:GetSecretValue on NEW_RELIC_LICENSE_KEY
 set -euo pipefail
 
-SOLR_IN_SH="/etc/default/solr.in.sh"
+SOLR_IN_SH="/opt/solr/current/bin/solr.in.sh"
 NR_YML="/opt/solr/current/newrelic/newrelic.yml"
 SOLR_DB_CONFIG_JNDI="/opt/solr/current/server/etc/evolve-jetty-jndi.xml"
 SOLR_SLAVE_CONF="/opt/solr/current/server/solr/evolve/conf/solrconfig.xml"
@@ -47,7 +47,7 @@ if [[ ! "${EFFECTIVE_MASTER_URL}" =~ ^https?:// ]]; then
   echo "[entrypoint] ERROR: SOLR_MASTER_URL must start with http:// or https://" >&2
   exit 1
 fi
-if [[ "${EFFECTIVE_MASTER_URL}" =~ [\'\"<>&|] ]]; then
+if [[ "${EFFECTIVE_MASTER_URL}" =~ [\'\"\&\|\<\>] ]]; then
   echo "[entrypoint] ERROR: SOLR_MASTER_URL contains characters invalid in XML/sed context" >&2
   exit 1
 fi

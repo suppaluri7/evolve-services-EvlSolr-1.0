@@ -5,7 +5,7 @@
 # IAM: ssm:GetParameter on /evolve/{env}/solr and secretsmanager:GetSecretValue on NEW_RELIC_LICENSE_KEY
 set -euo pipefail
 
-SOLR_IN_SH="/etc/default/solr.in.sh"
+SOLR_IN_SH="/opt/solr/current/bin/solr.in.sh"
 NR_YML="/opt/solr/current/newrelic/newrelic.yml"
 SOLR_DB_CONFIG_JNDI="/opt/solr/current/server/etc/evolve-jetty-jndi.xml"
 
