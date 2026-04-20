@@ -66,15 +66,8 @@ env:
   ARTIFACTORY_GENERIC: https://health.artifactory.tio.systems/artifactory
   ARTIFACTORY_BINARY_REPO: generic-evolve-services-dev-local
   APP_NAME: EvlSolrMaster
-  # Artifact routing is driven by the GHA_BUILD_STAGE repo variable at upload time.
-  # Fork runs always behave as 'poc' regardless of the variable's value.
-  # See the Upload step for the complete routing table (poc | parallel | production).
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # Job 1 — Binary Build
-  # Spec: checkout → Ant tar → verify artifact → upload to GHA + Artifactory
-  # ─────────────────────────────────────────────────────────────────────────────
   binary-build:
     name: Binary build & scan (EvlSolrMaster)
     runs-on: ubuntu-latest
@@ -100,31 +93,21 @@ jobs:
         id: version
         run: |
           VER="${{ inputs.version || '1.0.0' }}"
-          # BUILD_NUMBER_OFFSET: set this repo variable to the last Jenkins build number
-          # at cutover time so GHA run numbers continue the Jenkins sequence seamlessly.
-          # Leave unset (defaults to 0) during POC and parallel-run phases.
           OFFSET="${{ vars.BUILD_NUMBER_OFFSET || '0' }}"
           EFFECTIVE_BUILD_NUM=$(( ${{ github.run_number }} + OFFSET ))
           echo "version=${VER}" >> "$GITHUB_OUTPUT"
           echo "build_num=${EFFECTIVE_BUILD_NUM}" >> "$GITHUB_OUTPUT"
           echo "release_id=${APP_NAME}-${VER}-${EFFECTIVE_BUILD_NUM}" >> "$GITHUB_OUTPUT"
 
-      # 3c. Build binary artifact
       - name: Ant tar — build release unit
         env:
           PROJECT_VERSION: ${{ steps.version.outputs.version }}
-          # Use effective build number so MANIFEST.MF Implementation-Version matches
-          # the artifact filename, regardless of BUILD_NUMBER_OFFSET.
           BUILD_NUMBER: ${{ steps.version.outputs.build_num }}
-          # Mirrors Jenkins BUILD_TAG for MANIFEST.MF Build-Tag field
           BUILD_TAG: github-${{ github.workflow }}-${{ steps.version.outputs.build_num }}
-        # Pass scm.build.tag explicitly via -D because scm.xml never maps env.BUILD_TAG → scm.build.tag
         run: |
           ant -f vobs/EvolveEcom/Solr/master/build/build.xml tar \
             -Dscm.build.tag="${BUILD_TAG}"
 
-      # 3c-verify. Fail fast if expected artifact is absent (path derived from
-      # scm.xml: stage = ${VOB}/stage/${scm.deploy.name} )
       - name: Verify artifact produced
         id: artifact
         env:
@@ -139,18 +122,13 @@ jobs:
           echo "artifact_path=${ARTIFACT}" >> "$GITHUB_OUTPUT"
           echo "Artifact verified: ${ARTIFACT} ($(du -sh ${ARTIFACT} | cut -f1))"  
 
-      # Upload artifact to GHA for local inspection/download (Artifactory is the durable store)
       - name: Upload artifact to GHA
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.version.outputs.release_id }}
-          # Ant tar target writes to ${VOB}/stage/${scm.deploy.name}/ per scm.xml
           path: ${{ steps.artifact.outputs.artifact_path }}
           retention-days: 1     # short TTL — Artifactory is the durable store
 
-      # 3f. Check artifact into Artifactory (skipped on pull_request)
-      # JFrog CLI (jf rt upload) replaces raw curl so every artifact receives
-      # searchable properties — enabling AQL-based bulk cleanup and retention queries.
       - name: Setup JFrog CLI
         if: github.event_name != 'pull_request'
         uses: jfrog/setup-jfrog-cli@v4
@@ -212,12 +190,8 @@ jobs:
 
           ARTIFACT_URL="${ARTIFACTORY_GENERIC}/${TARGET_REPO}/${ARTIFACT_DEST}"
 
-          # Properties on every artifact enable AQL search and targeted cleanup:
-          #   jf rt search  --props "ci.engine=gha;ci.stage=poc" "generic-evolve-services-dev-local/POC/"
-          #   jf rt delete  "generic-evolve-services-dev-local/POC/GHA/" --quiet
           PROPS="ci.engine=gha;ci.stage=${BUILD_STAGE};ci.repo=${{ github.repository }};ci.run=${{ github.run_number }};ci.branch=${{ github.ref_name }};ci.sha=${{ github.sha }}"
 
-          # Ant tar target writes to stage/, not build/releases/ — see scm.xml
           jf rt upload \
             --target-props "${PROPS}" \
             "vobs/EvolveEcom/Solr/stage/EvlSolrMaster/${RELEASE_ID}.tar" \
