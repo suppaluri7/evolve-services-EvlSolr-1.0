@@ -85,10 +85,10 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
 
       - name: Set up Java 8 (Temurin)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.7.1
         with:
           distribution: temurin
           java-version: '8'
@@ -117,7 +117,7 @@ jobs:
           # the artifact filename, regardless of BUILD_NUMBER_OFFSET.
           BUILD_NUMBER: ${{ steps.version.outputs.build_num }}
           # Mirrors Jenkins BUILD_TAG for MANIFEST.MF Build-Tag field
-          BUILD_TAG: github-${{ github.workflow }}-${{ steps.version.outputs.build_num }}
+          BUILD_TAG: github-Build-EvlSolrMaster-${{ steps.version.outputs.build_num }}
         # Pass scm.build.tag explicitly via -D because scm.xml never maps env.BUILD_TAG → scm.build.tag
         run: |
           ant -f vobs/EvolveEcom/Solr/master/build/build.xml tar \
@@ -141,7 +141,7 @@ jobs:
 
       # Upload artifact to GHA for local inspection/download (Artifactory is the durable store)
       - name: Upload artifact to GHA
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ${{ steps.version.outputs.release_id }}
           # Ant tar target writes to ${VOB}/stage/${scm.deploy.name}/ per scm.xml
@@ -154,7 +154,7 @@ jobs:
       - name: Setup JFrog CLI
         if: github.event_name != 'pull_request'
         continue-on-error: true  # Artifactory is on private network; unreachable from GitHub-hosted runners
-        uses: jfrog/setup-jfrog-cli@v4
+        uses: jfrog/setup-jfrog-cli@v4.5.3
         env:
           JF_URL: https://health.artifactory.tio.systems/
           JF_USER: ${{ secrets.ARTIFACTORY_USER }}
