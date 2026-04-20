@@ -153,6 +153,7 @@ jobs:
       # searchable properties — enabling AQL-based bulk cleanup and retention queries.
       - name: Setup JFrog CLI
         if: github.event_name != 'pull_request'
+        continue-on-error: true  # Artifactory is on private network; unreachable from GitHub-hosted runners
         uses: jfrog/setup-jfrog-cli@v4
         env:
           JF_URL: https://health.artifactory.tio.systems/
@@ -162,6 +163,7 @@ jobs:
       - name: Upload binary artifact to Artifactory
         id: upload
         if: github.event_name != 'pull_request'
+        continue-on-error: true  # Artifactory is on private network; unreachable from GitHub-hosted runners
         env:
           VER: ${{ steps.version.outputs.version }}
           RELEASE_ID: ${{ steps.version.outputs.release_id }}
