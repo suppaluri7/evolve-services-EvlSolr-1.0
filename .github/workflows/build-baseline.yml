@@ -1,0 +1,156 @@
+name: Build TIO Baseline Image
+
+# Tier 1 — Base Image Build & Rotate
+#
+# Triggered by:
+#   - Weekly schedule (Monday 06:00 UTC) to pick up Core Engineering hardened image updates
+#   - Push to main/NHETIO-4421_Docker when the baseline Dockerfile itself changes
+#   - Manual workflow_dispatch (with optional tag override)
+#   - repository_dispatch from Core Engineering's pipeline (event: ce-baseline-updated)
+#
+# Outputs:
+#   Artifactory: docker-eols-cijenkins-local.health.artifactory.tio.systems/eols/tio-al2023-solr8:<tag>
+#   ECR:         <ECR_ACCOUNT_ID>.dkr.ecr.us-east-2.amazonaws.com/eols/tio-al2023-solr8:<tag>
+#
+# Downstream: on success, triggers build-evlsolrmaster and build-evlsolrslave
+#             via repository_dispatch (event: baseline-updated)
+#
+# Required secrets (repo or org level):
+#   ARTIFACTORY_USER        — Artifactory service account username
+#   ARTIFACTORY_TOKEN       — Artifactory API token (read + write docker repos)
+#   AWS_ECR_ROLE_ARN        — IAM Role ARN for OIDC-based ECR push
+#                             (must trust token.actions.githubusercontent.com)
+#
+# Required variables:
+#   ECR_ACCOUNT_ID          — AWS account hosting ECR  (e.g. 167920276477)
+#   ECR_REGION              — AWS region               (e.g. us-east-2)
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'    # Monday 06:00 UTC — picks up weekly CE image rotation
+  push:
+    branches: [main, NHETIO-4421_Docker]
+    paths:
+      - 'baseline/Dockerfile'   # reserved path for TIO baseline Dockerfile
+  repository_dispatch:
+    types: [ce-baseline-updated]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to publish (default: date-based)'
+        required: false
+        default: ''
+
+env:
+  ARTIFACTORY_REGISTRY: docker-eols-cijenkins-local.health.artifactory.tio.systems
+  ARTIFACTORY_REPO: eols
+  IMAGE_NAME: tio-al2023-solr8
+  CE_BASE_IMAGE: docker-eols-cijenkins-local.health.artifactory.tio.systems/eols/tio-al2023-java8:1.0.0
+  AWS_REGION: ${{ vars.ECR_REGION || 'us-east-2' }}
+
+jobs:
+  build-baseline:
+    name: Build & push TIO baseline image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write    # required for OIDC → AWS ECR
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [[ -n "${{ inputs.tag }}" ]]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="$(date -u +%Y%m%d)-${{ github.run_number }}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "latest=latest" >> "$GITHUB_OUTPUT"
+
+      # ── Artifactory login (pull CE base + push TIO baseline) ─────────────
+      - name: Log in to Artifactory
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ARTIFACTORY_REGISTRY }}
+          username: ${{ secrets.ARTIFACTORY_USER }}
+          password: ${{ secrets.ARTIFACTORY_TOKEN }}
+
+      # ── AWS OIDC → ECR ────────────────────────────────────────────────────
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ECR_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── Build ─────────────────────────────────────────────────────────────
+      # If no baseline/Dockerfile exists, build a passthrough image that simply
+      # re-tags the Core Engineering image as the TIO baseline.
+      - name: Build baseline image
+        run: |
+          ARTIFACTORY_TAG="${ARTIFACTORY_REGISTRY}/${ARTIFACTORY_REPO}/${IMAGE_NAME}:${{ steps.tag.outputs.tag }}"
+          ARTIFACTORY_LATEST="${ARTIFACTORY_REGISTRY}/${ARTIFACTORY_REPO}/${IMAGE_NAME}:latest"
+          ECR_TAG="${{ vars.ECR_ACCOUNT_ID }}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ARTIFACTORY_REPO}/${IMAGE_NAME}:${{ steps.tag.outputs.tag }}"
+          ECR_LATEST="${{ vars.ECR_ACCOUNT_ID }}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ARTIFACTORY_REPO}/${IMAGE_NAME}:latest"
+
+          if [[ -f baseline/Dockerfile ]]; then
+            # Build TIO's own baseline layer on top of CE image
+            docker build -f baseline/Dockerfile \
+              --build-arg CE_BASE_IMAGE="${CE_BASE_IMAGE}" \
+              -t "${ARTIFACTORY_TAG}" \
+              -t "${ARTIFACTORY_LATEST}" \
+              -t "${ECR_TAG}" \
+              -t "${ECR_LATEST}" \
+              .
+          else
+            # No custom baseline layer — re-tag CE image as TIO baseline
+            docker pull "${CE_BASE_IMAGE}"
+            docker tag "${CE_BASE_IMAGE}" "${ARTIFACTORY_TAG}"
+            docker tag "${CE_BASE_IMAGE}" "${ARTIFACTORY_LATEST}"
+            docker tag "${CE_BASE_IMAGE}" "${ECR_TAG}"
+            docker tag "${CE_BASE_IMAGE}" "${ECR_LATEST}"
+          fi
+
+          echo "ARTIFACTORY_TAG=${ARTIFACTORY_TAG}" >> "$GITHUB_ENV"
+          echo "ARTIFACTORY_LATEST=${ARTIFACTORY_LATEST}" >> "$GITHUB_ENV"
+          echo "ECR_TAG=${ECR_TAG}" >> "$GITHUB_ENV"
+          echo "ECR_LATEST=${ECR_LATEST}" >> "$GITHUB_ENV"
+
+      # ── Scan ──────────────────────────────────────────────────────────────
+      - name: Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.ARTIFACTORY_TAG }}
+          format: table
+          exit-code: '1'
+          severity: CRITICAL
+
+      # ── Push to Artifactory ───────────────────────────────────────────────
+      - name: Push to Artifactory
+        run: |
+          docker push "${{ env.ARTIFACTORY_TAG }}"
+          docker push "${{ env.ARTIFACTORY_LATEST }}"
+
+      # ── Push to ECR ───────────────────────────────────────────────────────
+      - name: Push to ECR
+        run: |
+          docker push "${{ env.ECR_TAG }}"
+          docker push "${{ env.ECR_LATEST }}"
+
+      # ── Trigger downstream application container builds ───────────────────
+      - name: Trigger downstream container builds
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api repos/${{ github.repository }}/dispatches \
+            --method POST \
+            --field event_type=baseline-updated \
+            --field client_payload='{"baseline_tag":"${{ steps.tag.outputs.tag }}"}'
+          echo "Dispatched baseline-updated to downstream workflows"

@@ -2,36 +2,34 @@
 # docker-entrypoint.sh — EvlSolrMaster  (NHETIO-4421)
 # Replaces: install_latest_solr.sh (DB creds, NR) + userdata_solr.tpl (heap, hostname)
 # Required: EVOLVE_INSTANCE_ENV  Optional: AWS_REGION, SOLR_JAVA_HEAP
-# IAM: secretsmanager:GetSecretValue on {env}/rds and NEW_RELIC_LICENSE_KEY
+# IAM: ssm:GetParameter on /evolve/{env}/solr and secretsmanager:GetSecretValue on NEW_RELIC_LICENSE_KEY
 set -euo pipefail
 
-SOLR_IN_SH="/etc/default/solr.in.sh"
+SOLR_IN_SH="/opt/solr/current/bin/solr.in.sh"
 NR_YML="/opt/solr/current/newrelic/newrelic.yml"
 SOLR_DB_CONFIG_JNDI="/opt/solr/current/server/etc/evolve-jetty-jndi.xml"
 
 AWS_REGION="${AWS_REGION:-us-east-2}"
 
-# 1. DB credentials — replaces: getJsonSecret "${BUILD_ENV}/rds" in install_latest_solr.sh
-echo "[entrypoint] Fetching DB credentials from Secrets Manager..."
-DB_CREDS=$(aws secretsmanager get-secret-value \
-  --secret-id "${EVOLVE_INSTANCE_ENV}/rds" \
+# 1. DB credentials — SSM path: /evolve/{env}/solr (SecureString)
+# Fields: dbUrl (full JDBC URL), dbUser, dbPasswd
+echo "[entrypoint] Fetching DB credentials from SSM Parameter Store..."
+DB_CREDS=$(aws ssm get-parameter \
+  --name "/evolve/${EVOLVE_INSTANCE_ENV}/solr" \
+  --with-decryption \
   --region "${AWS_REGION}" \
-  --query SecretString \
+  --query Parameter.Value \
   --output text)
 
-EVOLVE_JDBC_HOST=$(echo "${DB_CREDS}"     | jq -r '.host')
-EVOLVE_JDBC_PORT=$(echo "${DB_CREDS}"     | jq -r '.port')
-EVOLVE_JDBC_DBNAME=$(echo "${DB_CREDS}"   | jq -r '.dbname')
-EVOLVE_JDBC_USERNAME=$(echo "${DB_CREDS}" | jq -r '.username')
-EVOLVE_JDBC_PASSWORD=$(echo "${DB_CREDS}" | jq -r '.password')
-EVOLVE_JDBC_STRING="jdbc:oracle:thin:@//${EVOLVE_JDBC_HOST}:${EVOLVE_JDBC_PORT}/${EVOLVE_JDBC_DBNAME}"
+EVOLVE_JDBC_STRING=$(echo "${DB_CREDS}"   | jq -r '.dbUrl')
+EVOLVE_JDBC_USERNAME=$(echo "${DB_CREDS}" | jq -r '.dbUser')
+EVOLVE_JDBC_PASSWORD=$(echo "${DB_CREDS}" | jq -r '.dbPasswd')
 
 sed -i "s|EVOLVE_DB_URL|${EVOLVE_JDBC_STRING}|g"        "${SOLR_DB_CONFIG_JNDI}"
 sed -i "s|EVOLVE_DB_USERNAME|${EVOLVE_JDBC_USERNAME}|g"  "${SOLR_DB_CONFIG_JNDI}"
 sed -i "s|EVOLVE_DB_PASSWORD|${EVOLVE_JDBC_PASSWORD}|g"  "${SOLR_DB_CONFIG_JNDI}"
 # Scrub: prevent credentials from residing in shell memory beyond this point
-unset DB_CREDS EVOLVE_JDBC_HOST EVOLVE_JDBC_PORT EVOLVE_JDBC_DBNAME \
-      EVOLVE_JDBC_USERNAME EVOLVE_JDBC_PASSWORD EVOLVE_JDBC_STRING
+unset DB_CREDS EVOLVE_JDBC_STRING EVOLVE_JDBC_USERNAME EVOLVE_JDBC_PASSWORD
 echo "[entrypoint] DB credentials injected."
 
 # 2. Java heap — replaces: SOLR_JAVA_HEAP_OVERRIDE in userdata_solr.tpl

@@ -1,0 +1,228 @@
+name: Build EvlSolrMaster
+
+# Ticket: NHETIO-4435 — GHA Build Binary (EvlSolrMaster)
+#
+# Scope: "Build Binary" box only (top square in the Container Automation diagram).
+#   Ant build → store binary artifact in Artifactory.
+#   Container build (Job 2) and Cortex PR (Job 3) are out of scope for this ticket.
+#
+# Triggers:
+#   - Push to main/NHETIO-4421_Docker on relevant source paths
+#   - Pull request (binary-build + scan only; no push)
+#   - repository_dispatch(baseline-updated) from build-baseline.yml
+#   - workflow_dispatch with version + environment inputs
+#
+# Required secrets:
+#   ARTIFACTORY_USER  — Artifactory service account username
+#   ARTIFACTORY_TOKEN — Artifactory API token (read + write)
+#
+# ── Fork / POC isolation ──────────────────────────────────────────────────────
+# This workflow is safe to run from a personal fork. It NEVER writes to the
+# canonical Jenkins artifact paths. Isolation is enforced at two levels:
+#
+#   1. GitHub Actions on a fork are completely isolated from the upstream repo.
+#      The upstream canonical repo is never triggered or affected.
+#      Fork secrets are independent — add ARTIFACTORY_USER / ARTIFACTORY_TOKEN
+#      etc. under your fork's  Settings → Secrets → Actions.
+#
+#   2. Artifactory path isolation: fork runs write under
+#        POC/GHA/<github-owner>/EvolveEcom/EvlSolr/EvlSolrMaster/<ver>/
+#      Canonical Jenkins builds write under:
+#        EvolveEcom/EvlSolr/EvlSolrMaster/<ver>/
+#      Paths are mutually exclusive — no collision is possible.
+#      POC artifacts can be bulk-deleted from Artifactory by removing the
+#      POC/GHA/<owner>/ subtree when the POC is complete.
+
+on:
+  push:
+    branches:
+      - main
+      - NHETIO-4421_Docker
+    paths:
+      - 'vobs/EvolveEcom/Solr/master/**'
+      - 'vobs/EvolveEcom/Solr/build/**'
+      - 'vobs/EvolveEcom/Solr/setup/**'
+      - 'master/Dockerfile'
+      - 'master/docker-entrypoint.sh'
+      - 'tio-utils.sh'
+  pull_request:
+    paths:
+      - 'vobs/EvolveEcom/Solr/master/**'
+      - 'vobs/EvolveEcom/Solr/build/**'
+      - 'vobs/EvolveEcom/Solr/setup/**'
+      - 'master/Dockerfile'
+      - 'master/docker-entrypoint.sh'
+      - 'tio-utils.sh'
+  repository_dispatch:
+    types: [baseline-updated]   # fired by build-baseline.yml on new TIO base image
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+
+env:
+  ARTIFACTORY_GENERIC: https://health.artifactory.tio.systems/artifactory
+  ARTIFACTORY_BINARY_REPO: generic-evolve-services-dev-local
+  APP_NAME: EvlSolrMaster
+  # Artifact routing is driven by the GHA_BUILD_STAGE repo variable at upload time.
+  # Fork runs always behave as 'poc' regardless of the variable's value.
+  # See the Upload step for the complete routing table (poc | parallel | production).
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────────────
+  # Job 1 — Binary Build
+  # Spec: checkout → Ant tar → verify artifact → upload to GHA + Artifactory
+  # ─────────────────────────────────────────────────────────────────────────────
+  binary-build:
+    name: Binary build & scan (EvlSolrMaster)
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      release_id: ${{ steps.version.outputs.release_id }}
+      artifact_url: ${{ steps.upload.outputs.artifact_url }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 8 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+
+      - name: Install Ant
+        run: sudo apt-get install -y --no-install-recommends ant
+
+      - name: Resolve version and release ID
+        id: version
+        run: |
+          VER="${{ inputs.version || '1.0.0' }}"
+          # BUILD_NUMBER_OFFSET: set this repo variable to the last Jenkins build number
+          # at cutover time so GHA run numbers continue the Jenkins sequence seamlessly.
+          # Leave unset (defaults to 0) during POC and parallel-run phases.
+          OFFSET="${{ vars.BUILD_NUMBER_OFFSET || '0' }}"
+          EFFECTIVE_BUILD_NUM=$(( ${{ github.run_number }} + OFFSET ))
+          echo "version=${VER}" >> "$GITHUB_OUTPUT"
+          echo "build_num=${EFFECTIVE_BUILD_NUM}" >> "$GITHUB_OUTPUT"
+          echo "release_id=${APP_NAME}-${VER}-${EFFECTIVE_BUILD_NUM}" >> "$GITHUB_OUTPUT"
+
+      # 3c. Build binary artifact
+      - name: Ant tar — build release unit
+        env:
+          PROJECT_VERSION: ${{ steps.version.outputs.version }}
+          # Use effective build number so MANIFEST.MF Implementation-Version matches
+          # the artifact filename, regardless of BUILD_NUMBER_OFFSET.
+          BUILD_NUMBER: ${{ steps.version.outputs.build_num }}
+          # Mirrors Jenkins BUILD_TAG for MANIFEST.MF Build-Tag field
+          BUILD_TAG: github-${{ github.workflow }}-${{ steps.version.outputs.build_num }}
+        # Pass scm.build.tag explicitly via -D because scm.xml never maps env.BUILD_TAG → scm.build.tag
+        run: |
+          ant -f vobs/EvolveEcom/Solr/master/build/build.xml tar \
+            -Dscm.build.tag="${BUILD_TAG}"
+
+      # 3c-verify. Fail fast if expected artifact is absent (path derived from
+      # scm.xml: stage = ${VOB}/stage/${scm.deploy.name} )
+      - name: Verify artifact produced
+        id: artifact
+        env:
+          RELEASE_ID: ${{ steps.version.outputs.release_id }}
+        run: |
+          ARTIFACT="vobs/EvolveEcom/Solr/stage/EvlSolrMaster/${RELEASE_ID}.tar"
+          if [[ ! -f "${ARTIFACT}" ]]; then
+            echo "ERROR: Expected artifact not found at ${ARTIFACT}"
+            ls -lh vobs/EvolveEcom/Solr/stage/EvlSolrMaster/ 2>/dev/null || echo "(stage directory does not exist)"
+            exit 1
+          fi
+          echo "artifact_path=${ARTIFACT}" >> "$GITHUB_OUTPUT"
+          echo "Artifact verified: ${ARTIFACT} ($(du -sh ${ARTIFACT} | cut -f1))"  
+
+      # Upload artifact to GHA for local inspection/download (Artifactory is the durable store)
+      - name: Upload artifact to GHA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.release_id }}
+          # Ant tar target writes to ${VOB}/stage/${scm.deploy.name}/ per scm.xml
+          path: ${{ steps.artifact.outputs.artifact_path }}
+          retention-days: 1     # short TTL — Artifactory is the durable store
+
+      # 3f. Check artifact into Artifactory (skipped on pull_request)
+      # JFrog CLI (jf rt upload) replaces raw curl so every artifact receives
+      # searchable properties — enabling AQL-based bulk cleanup and retention queries.
+      - name: Setup JFrog CLI
+        if: github.event_name != 'pull_request'
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: https://health.artifactory.tio.systems/
+          JF_USER: ${{ secrets.ARTIFACTORY_USER }}
+          JF_PASSWORD: ${{ secrets.ARTIFACTORY_TOKEN }}
+
+      - name: Upload binary artifact to Artifactory
+        id: upload
+        if: github.event_name != 'pull_request'
+        env:
+          VER: ${{ steps.version.outputs.version }}
+          RELEASE_ID: ${{ steps.version.outputs.release_id }}
+        run: |
+          # ── Build stage routing ───────────────────────────────────────────────
+          # Set repo variable GHA_BUILD_STAGE to control where artifacts land:
+          #
+          #   poc       (default) — isolated sub-path in the existing dev repo.
+          #             Fork:      generic-evolve-services-dev-local/POC/GHA/<owner>/...
+          #             Canon org: generic-evolve-services-dev-local/POC/GHA/canonical/...
+          #             Cleanup:   jf rt delete "generic-evolve-services-dev-local/POC/" --quiet
+          #
+          #   parallel  — dedicated GHA staging repo with the same canonical path
+          #             structure as production (drop-in replacements once validated).
+          #             Zero collision risk: no downstream system reads this repo.
+          #             One TechDesk ticket required: create generic-evolve-gha-testing-local.
+          #
+          #   production — canonical repo + path; identical to Jenkins output.
+          #             Only flip after BUILD_NUMBER_OFFSET is set and Jenkins
+          #             pipeline is decommissioned.
+          # ───────────────────────────────────────────────────────────────────
+          if [[ "${{ github.repository_owner }}" != "elsevier-health" ]]; then
+            # Personal fork — always POC isolation, always safe to purge
+            TARGET_REPO="${ARTIFACTORY_BINARY_REPO}"
+            ARTIFACT_DEST="POC/GHA/${{ github.repository_owner }}/EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
+            BUILD_STAGE="poc"
+          else
+            BUILD_STAGE="${{ vars.GHA_BUILD_STAGE || 'poc' }}"
+            case "${BUILD_STAGE}" in
+              poc)
+                TARGET_REPO="${ARTIFACTORY_BINARY_REPO}"
+                ARTIFACT_DEST="POC/GHA/canonical/EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
+                ;;
+              parallel)
+                TARGET_REPO="generic-evolve-gha-testing-local"
+                ARTIFACT_DEST="EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
+                ;;
+              production)
+                TARGET_REPO="${ARTIFACTORY_BINARY_REPO}"
+                ARTIFACT_DEST="EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
+                ;;
+              *)
+                echo "ERROR: Unknown GHA_BUILD_STAGE '${BUILD_STAGE}'. Must be: poc | parallel | production" >&2
+                exit 1
+                ;;
+            esac
+          fi
+
+          ARTIFACT_URL="${ARTIFACTORY_GENERIC}/${TARGET_REPO}/${ARTIFACT_DEST}"
+
+          # Properties on every artifact enable AQL search and targeted cleanup:
+          #   jf rt search  --props "ci.engine=gha;ci.stage=poc" "generic-evolve-services-dev-local/POC/"
+          #   jf rt delete  "generic-evolve-services-dev-local/POC/GHA/" --quiet
+          PROPS="ci.engine=gha;ci.stage=${BUILD_STAGE};ci.repo=${{ github.repository }};ci.run=${{ github.run_number }};ci.branch=${{ github.ref_name }};ci.sha=${{ github.sha }}"
+
+          # Ant tar target writes to stage/, not build/releases/ — see scm.xml
+          jf rt upload \
+            --target-props "${PROPS}" \
+            "vobs/EvolveEcom/Solr/stage/EvlSolrMaster/${RELEASE_ID}.tar" \
+            "${TARGET_REPO}/${ARTIFACT_DEST}"
+
+          echo "artifact_url=${ARTIFACT_URL}" >> "$GITHUB_OUTPUT"
+          echo "Build stage: ${BUILD_STAGE} | Repo: ${TARGET_REPO}"
+          echo "Published: ${ARTIFACT_URL}"

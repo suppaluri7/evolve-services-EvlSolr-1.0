@@ -3,42 +3,43 @@
 # Replaces: install_latest_solr.sh + userdata_solr.tpl (same as master)
 # Slave additions: step 1b patches masterUrl; step 4 NR app name uses "solrslave"
 # Required: EVOLVE_INSTANCE_ENV  Optional: AWS_REGION, SOLR_JAVA_HEAP, SOLR_MASTER_URL
-# IAM: secretsmanager:GetSecretValue on {env}/rds and NEW_RELIC_LICENSE_KEY
+# IAM: ssm:GetParameter on /evolve/{env}/solr and secretsmanager:GetSecretValue on NEW_RELIC_LICENSE_KEY
 set -euo pipefail
 
-SOLR_IN_SH="/etc/default/solr.in.sh"
+SOLR_IN_SH="/opt/solr/current/bin/solr.in.sh"
 NR_YML="/opt/solr/current/newrelic/newrelic.yml"
 SOLR_DB_CONFIG_JNDI="/opt/solr/current/server/etc/evolve-jetty-jndi.xml"
 SOLR_SLAVE_CONF="/opt/solr/current/server/solr/evolve/conf/solrconfig.xml"
 
 AWS_REGION="${AWS_REGION:-us-east-2}"
 
-# 1. DB credentials — replaces: getJsonSecret "${BUILD_ENV}/rds" in install_latest_solr.sh
-echo "[entrypoint] Fetching DB credentials from Secrets Manager..."
-DB_CREDS=$(aws secretsmanager get-secret-value \
-  --secret-id "${EVOLVE_INSTANCE_ENV}/rds" \
+# 1. DB credentials + master host — SSM path: /evolve/{env}/solr (SecureString)
+# Fields: dbUrl (full JDBC URL), dbUser, dbPasswd, solr_master_host
+echo "[entrypoint] Fetching DB credentials from SSM Parameter Store..."
+DB_CREDS=$(aws ssm get-parameter \
+  --name "/evolve/${EVOLVE_INSTANCE_ENV}/solr" \
+  --with-decryption \
   --region "${AWS_REGION}" \
-  --query SecretString \
+  --query Parameter.Value \
   --output text)
 
-EVOLVE_JDBC_HOST=$(echo "${DB_CREDS}"     | jq -r '.host')
-EVOLVE_JDBC_PORT=$(echo "${DB_CREDS}"     | jq -r '.port')
-EVOLVE_JDBC_DBNAME=$(echo "${DB_CREDS}"   | jq -r '.dbname')
-EVOLVE_JDBC_USERNAME=$(echo "${DB_CREDS}" | jq -r '.username')
-EVOLVE_JDBC_PASSWORD=$(echo "${DB_CREDS}" | jq -r '.password')
-EVOLVE_JDBC_STRING="jdbc:oracle:thin:@//${EVOLVE_JDBC_HOST}:${EVOLVE_JDBC_PORT}/${EVOLVE_JDBC_DBNAME}"
+EVOLVE_JDBC_STRING=$(echo "${DB_CREDS}"   | jq -r '.dbUrl')
+EVOLVE_JDBC_USERNAME=$(echo "${DB_CREDS}" | jq -r '.dbUser')
+EVOLVE_JDBC_PASSWORD=$(echo "${DB_CREDS}" | jq -r '.dbPasswd')
+SSM_MASTER_HOST=$(echo "${DB_CREDS}"      | jq -r '.solr_master_host // empty')
 
 sed -i "s|EVOLVE_DB_URL|${EVOLVE_JDBC_STRING}|g"        "${SOLR_DB_CONFIG_JNDI}"
 sed -i "s|EVOLVE_DB_USERNAME|${EVOLVE_JDBC_USERNAME}|g"  "${SOLR_DB_CONFIG_JNDI}"
 sed -i "s|EVOLVE_DB_PASSWORD|${EVOLVE_JDBC_PASSWORD}|g"  "${SOLR_DB_CONFIG_JNDI}"
 # Scrub: prevent credentials from residing in shell memory beyond this point
-unset DB_CREDS EVOLVE_JDBC_HOST EVOLVE_JDBC_PORT EVOLVE_JDBC_DBNAME \
-      EVOLVE_JDBC_USERNAME EVOLVE_JDBC_PASSWORD EVOLVE_JDBC_STRING
+unset DB_CREDS EVOLVE_JDBC_STRING EVOLVE_JDBC_USERNAME EVOLVE_JDBC_PASSWORD
 echo "[entrypoint] DB credentials injected."
 
 # 1b. masterUrl patch (Slave only) — replaces: hardcoded EC2 DNS in EvlSolrSlave artifact's solrconfig.xml
-# Falls back to baked-in EC2 DNS when SOLR_MASTER_URL is unset (migration compatibility)
-DEFAULT_MASTER_URL="http://solr-mstr-${EVOLVE_INSTANCE_ENV}.ehsevolve.com/solr/evolve/replication"
+# Precedence: SOLR_MASTER_URL env var > solr_master_host from SSM > env-convention fallback
+DEFAULT_MASTER_URL="${SSM_MASTER_HOST:+${SSM_MASTER_HOST}/solr/evolve/replication}"
+DEFAULT_MASTER_URL="${DEFAULT_MASTER_URL:-http://solr-mstr-${EVOLVE_INSTANCE_ENV}.ehsevolve.com/solr/evolve/replication}"
+unset SSM_MASTER_HOST
 EFFECTIVE_MASTER_URL="${SOLR_MASTER_URL:-${DEFAULT_MASTER_URL}}"
 
 # Validate before injecting into XML to prevent XML injection / sed delimiter collision
@@ -46,7 +47,7 @@ if [[ ! "${EFFECTIVE_MASTER_URL}" =~ ^https?:// ]]; then
   echo "[entrypoint] ERROR: SOLR_MASTER_URL must start with http:// or https://" >&2
   exit 1
 fi
-if [[ "${EFFECTIVE_MASTER_URL}" =~ [\'\"<>\&\|] ]]; then
+if [[ "${EFFECTIVE_MASTER_URL}" =~ [\'\"\&\|\<\>] ]]; then
   echo "[entrypoint] ERROR: SOLR_MASTER_URL contains characters invalid in XML/sed context" >&2
   exit 1
 fi
