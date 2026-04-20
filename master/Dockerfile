@@ -16,8 +16,10 @@ ARG NR_VERSION=8.20.0
 ARG NR_SHA256="7a02e115ce945843fab71b5ae155bef80733d80e000ab3c3f51df36422281bdf"
 ARG NR_ARTIFACT_URL="https://health.artifactory.tio.systems/artifactory/maven-central-remote/com/newrelic/agent/java/newrelic-java/${NR_VERSION}/newrelic-java-${NR_VERSION}.zip"
 
-# Required: Artifactory URL for EvlSolrMaster-<version>.tgz
+# Required: Artifactory URL for EvlSolrMaster-<version>.tar
 ARG EVLSOLRMASTER_ARTIFACT_URL
+# Target environment: dev | cert | stage | prod
+ARG SOLR_ENV=prod
 
 RUN echo "sslverify=${DNF_SSLVERIFY}" >> /etc/dnf/dnf.conf \
     && dnf install -y --allowerasing \
@@ -61,11 +63,14 @@ COPY tio-utils.sh /opt/tio/
 
 RUN curl ${CURL_OPTS} -fSL \
       "${EVLSOLRMASTER_ARTIFACT_URL}" \
-      -o /opt/tio/EvlSolrMaster.tgz \
+      -o /opt/tio/EvlSolrMaster.tar \
+    && tar -xf /opt/tio/EvlSolrMaster.tar -C /opt/tio/ \
+    && tar -xzf /opt/tio/EvlSolrMaster-*/EvlSolrMaster.tgz -C /opt/tio/ \
     && mkdir -p /opt/solr/current/server/solr/evolve \
-    && tar -xzf /opt/tio/EvlSolrMaster.tgz \
+    && tar -xzf /opt/tio/EvlSolrMaster-*/${SOLR_ENV}/EvlSolrMaster.tgz \
+         --strip-components=1 \
          -C /opt/solr/current/server/solr/evolve/ \
-    && rm /opt/tio/EvlSolrMaster.tgz
+    && rm -rf /opt/tio/EvlSolrMaster.tar /opt/tio/EvlSolrMaster-*/
 
 RUN echo "name=evolve" > /opt/solr/current/server/solr/evolve/core.properties
 
