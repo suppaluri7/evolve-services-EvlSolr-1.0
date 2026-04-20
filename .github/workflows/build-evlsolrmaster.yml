@@ -61,12 +61,6 @@ on:
         description: 'Release version (e.g. 1.0.0)'
         required: false
         default: '1.0.0'
-      environment:
-        description: 'Solr environment for Docker config layer'
-        required: false
-        type: choice
-        options: [dev, cert, stage, prod]
-        default: dev
 
 env:
   ARTIFACTORY_GENERIC: https://health.artifactory.tio.systems/artifactory
@@ -79,7 +73,7 @@ env:
 jobs:
   # ─────────────────────────────────────────────────────────────────────────────
   # Job 1 — Binary Build
-  # Spec: checks out code, builds binary artifact, tests & scans, uploads to Artifactory
+  # Spec: checkout → Ant tar → verify artifact → upload to GHA + Artifactory
   # ─────────────────────────────────────────────────────────────────────────────
   binary-build:
     name: Binary build & scan (EvlSolrMaster)
@@ -98,6 +92,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '8'
+
+      - name: Install Ant
+        run: sudo apt-get install -y --no-install-recommends ant
 
       - name: Resolve version and release ID
         id: version
