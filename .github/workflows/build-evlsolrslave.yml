@@ -71,7 +71,7 @@ env:
 jobs:
   binary-build:
     name: Binary build & scan (EvlSolrSlave)
-    runs-on: [self-hosted, linux]
+    runs-on: [self-hosted, macOS, x64]
     outputs:
       version: ${{ steps.version.outputs.version }}
       release_id: ${{ steps.version.outputs.release_id }}
@@ -88,7 +88,7 @@ jobs:
           java-version: '8'
 
       - name: Install Ant
-        run: which ant || sudo apt-get install -y --no-install-recommends ant
+        run: which ant || brew install ant
 
       - name: Resolve version and release ID
         id: version
