@@ -79,6 +79,9 @@ jobs:
     name: Binary build & scan (EvlSolrMaster)
     runs-on:
       group: elsevier-standard-runners
+    container:
+      image: docker-default-virtual.bts.artifactory.tio.systems/eclipse-temurin:8
+      options: "--user 1001:1001"
     outputs:
       version: ${{ steps.version.outputs.version }}
       release_id: ${{ steps.version.outputs.release_id }}
@@ -88,8 +91,9 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Assert build tools
+      - name: Install Ant and assert build tools
         run: |
+          apt-get update -qq && apt-get install -y --no-install-recommends ant
           java -version
           ant -version
 
