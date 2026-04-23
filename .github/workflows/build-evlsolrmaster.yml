@@ -33,11 +33,12 @@ name: Build EvlSolrMaster
 #      POC artifacts can be bulk-deleted from Artifactory by removing the
 #      POC/GHA/<owner>/ subtree when the POC is complete.
 
-on:
+"on":
   push:
     branches:
       - main
       - NHETIO-4421_Docker
+      - NHETIO-4435-gha-evlsolrmaster
     paths:
       - 'vobs/EvolveEcom/Solr/master/**'
       - 'vobs/EvolveEcom/Solr/build/**'
