@@ -81,14 +81,10 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Set up Java 8 (Temurin)
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '8'
-
-      - name: Install Ant
-        run: which ant || brew install ant
+      - name: Assert build tools
+        run: |
+          java -version
+          ant -version
 
       - name: Resolve version and release ID
         id: version
