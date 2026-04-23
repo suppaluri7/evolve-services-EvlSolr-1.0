@@ -70,7 +70,7 @@ env:
 jobs:
   binary-build:
     name: Binary build & scan (EvlSolrSlave)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux]
     outputs:
       version: ${{ steps.version.outputs.version }}
       release_id: ${{ steps.version.outputs.release_id }}
@@ -87,7 +87,7 @@ jobs:
           java-version: '8'
 
       - name: Install Ant
-        run: sudo apt-get install -y --no-install-recommends ant
+        run: which ant || sudo apt-get install -y --no-install-recommends ant
 
       - name: Resolve version and release ID
         id: version
@@ -129,42 +129,18 @@ jobs:
           path: ${{ steps.artifact.outputs.artifact_path }}
           retention-days: 1     # short TTL — Artifactory is the durable store
 
-      - name: Setup JFrog CLI
-        if: github.event_name != 'pull_request'
-        continue-on-error: true
-        uses: jfrog/setup-jfrog-cli@v4
-        env:
-          JF_URL: https://health.artifactory.tio.systems/
-          JF_USER: ${{ secrets.ARTIFACTORY_USER }}
-          JF_PASSWORD: ${{ secrets.ARTIFACTORY_TOKEN }}
-
       - name: Upload binary artifact to Artifactory
         id: upload
         if: github.event_name != 'pull_request'
         continue-on-error: true
+        # NOTE: health.artifactory.tio.systems resolves to a private IP (10.x).
+        # This step succeeds only on a self-hosted runner with VPN/network access.
+        # On public GitHub-hosted runners it times out; continue-on-error keeps the job green.
         env:
           VER: ${{ steps.version.outputs.version }}
           RELEASE_ID: ${{ steps.version.outputs.release_id }}
         run: |
-          # ── Build stage routing ───────────────────────────────────────────────
-          # Set repo variable GHA_BUILD_STAGE to control where artifacts land:
-          #
-          #   poc       (default) — isolated sub-path in the existing dev repo.
-          #             Fork:      generic-evolve-services-dev-local/POC/GHA/<owner>/...
-          #             Canon org: generic-evolve-services-dev-local/POC/GHA/canonical/...
-          #             Cleanup:   jf rt delete "generic-evolve-services-dev-local/POC/" --quiet
-          #
-          #   parallel  — dedicated GHA staging repo with the same canonical path
-          #             structure as production (drop-in replacements once validated).
-          #             Zero collision risk: no downstream system reads this repo.
-          #             One TechDesk ticket required: create generic-evolve-gha-testing-local.
-          #
-          #   production — canonical repo + path; identical to Jenkins output.
-          #             Only flip after BUILD_NUMBER_OFFSET is set and Jenkins
-          #             pipeline is decommissioned.
-          # ───────────────────────────────────────────────────────────────────
           if [[ "${{ github.repository_owner }}" != "elsevier-health" ]]; then
-            # Personal fork — always POC isolation, always safe to purge
             TARGET_REPO="${ARTIFACTORY_BINARY_REPO}"
             ARTIFACT_DEST="POC/GHA/${{ github.repository_owner }}/EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
             BUILD_STAGE="poc"
@@ -191,13 +167,13 @@ jobs:
           fi
 
           ARTIFACT_URL="${ARTIFACTORY_GENERIC}/${TARGET_REPO}/${ARTIFACT_DEST}"
-
           PROPS="ci.engine=gha;ci.stage=${BUILD_STAGE};ci.repo=${{ github.repository }};ci.run=${{ github.run_number }};ci.branch=${{ github.ref_name }};ci.sha=${{ github.sha }}"
 
-          jf rt upload \
-            --target-props "${PROPS}" \
-            "vobs/EvolveEcom/Solr/stage/EvlSolrSlave/${RELEASE_ID}.tar" \
-            "${TARGET_REPO}/${ARTIFACT_DEST}"
+          curl -f -u "${{ secrets.ARTIFACTORY_USER }}:${{ secrets.ARTIFACTORY_TOKEN }}" \
+            -H "X-Checksum-Deploy: false" \
+            -H "X-Artifactory-Prop: ${PROPS}" \
+            -T "vobs/EvolveEcom/Solr/stage/EvlSolrSlave/${RELEASE_ID}.tar" \
+            "${ARTIFACT_URL}"
 
           echo "artifact_url=${ARTIFACT_URL}" >> "$GITHUB_OUTPUT"
           echo "Build stage: ${BUILD_STAGE} | Repo: ${TARGET_REPO}"
