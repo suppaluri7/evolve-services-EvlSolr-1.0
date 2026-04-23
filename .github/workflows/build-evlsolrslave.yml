@@ -12,9 +12,8 @@ name: Build EvlSolrSlave
 #   - repository_dispatch(baseline-updated) from build-baseline.yml
 #   - workflow_dispatch with version + environment inputs
 #
-# Required secrets:
-#   ARTIFACTORY_USER  — Artifactory service account username
-#   ARTIFACTORY_TOKEN — Artifactory API token (read + write)
+# Auth: JFrog OIDC (id-token: write) — no username/password secrets needed.
+#   Uses OIDC provider: artifactory-evolve-bo-generic-users
 #
 # ── Fork / POC isolation ─────────────────────────────────────────────────────
 # This workflow is safe to run from a personal fork. It NEVER writes to the
@@ -63,15 +62,23 @@ name: Build EvlSolrSlave
         required: false
         default: '1.0.0'
 
+permissions:
+  contents: read
+  id-token: write
+
 env:
   ARTIFACTORY_GENERIC: https://health.artifactory.tio.systems/artifactory
   ARTIFACTORY_BINARY_REPO: generic-evolve-services-dev-local
+  JFROG_URL: https://health.artifactory.tio.systems/
+  JFROG_OIDC_PROVIDER: artifactory-evolve-bo-generic-users
+  JFROG_OIDC_AUDIENCE: artifactory-evolve-bo-generic-users
   APP_NAME: EvlSolrSlave
 
 jobs:
   binary-build:
     name: Binary build & scan (EvlSolrSlave)
-    runs-on: [self-hosted, macOS, x64]
+    runs-on:
+      group: elsevier-standard-runners
     outputs:
       version: ${{ steps.version.outputs.version }}
       release_id: ${{ steps.version.outputs.release_id }}
@@ -119,60 +126,32 @@ jobs:
           echo "artifact_path=${ARTIFACT}" >> "$GITHUB_OUTPUT"
           echo "Artifact verified: ${ARTIFACT} ($(du -sh ${ARTIFACT} | cut -f1))"
 
-      - name: Upload artifact to GHA
-        continue-on-error: true
-        uses: actions/upload-artifact@v4
+      - name: Setup JFrog CLI
+        if: github.event_name != 'pull_request'
+        id: artifactory
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ env.JFROG_URL }}
         with:
-          name: ${{ steps.version.outputs.release_id }}
-          path: ${{ steps.artifact.outputs.artifact_path }}
-          retention-days: 1     # short TTL — Artifactory is the durable store
+          oidc-provider-name: ${{ env.JFROG_OIDC_PROVIDER }}
+          oidc-audience: ${{ env.JFROG_OIDC_AUDIENCE }}
 
       - name: Upload binary artifact to Artifactory
         id: upload
         if: github.event_name != 'pull_request'
-        continue-on-error: true
-        # NOTE: health.artifactory.tio.systems resolves to a private IP (10.x).
-        # This step succeeds only on a self-hosted runner with VPN/network access.
-        # On public GitHub-hosted runners it times out; continue-on-error keeps the job green.
         env:
           VER: ${{ steps.version.outputs.version }}
           RELEASE_ID: ${{ steps.version.outputs.release_id }}
         run: |
-          if [[ "${{ github.repository_owner }}" != "elsevier-health" ]]; then
-            TARGET_REPO="${ARTIFACTORY_BINARY_REPO}"
-            ARTIFACT_DEST="POC/GHA/${{ github.repository_owner }}/EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
-            BUILD_STAGE="poc"
-          else
-            BUILD_STAGE="${{ vars.GHA_BUILD_STAGE || 'poc' }}"
-            case "${BUILD_STAGE}" in
-              poc)
-                TARGET_REPO="${ARTIFACTORY_BINARY_REPO}"
-                ARTIFACT_DEST="POC/GHA/canonical/EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
-                ;;
-              parallel)
-                TARGET_REPO="generic-evolve-gha-testing-local"
-                ARTIFACT_DEST="EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
-                ;;
-              production)
-                TARGET_REPO="${ARTIFACTORY_BINARY_REPO}"
-                ARTIFACT_DEST="EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
-                ;;
-              *)
-                echo "ERROR: Unknown GHA_BUILD_STAGE '${BUILD_STAGE}'. Must be: poc | parallel | production" >&2
-                exit 1
-                ;;
-            esac
-          fi
+          TARGET_REPO="${ARTIFACTORY_BINARY_REPO}"
+          ARTIFACT_DEST="POC/GHA/${{ github.repository_owner }}/EvolveEcom/EvlSolr/${APP_NAME}/${VER}/${RELEASE_ID}.tar"
+          PROPS="ci.engine=gha;ci.stage=poc;ci.repo=${{ github.repository }};ci.run=${{ github.run_number }};ci.branch=${{ github.ref_name }};ci.sha=${{ github.sha }}"
+
+          jf rt upload \
+            --target-props "${PROPS}" \
+            "vobs/EvolveEcom/Solr/stage/${APP_NAME}/${RELEASE_ID}.tar" \
+            "${TARGET_REPO}/${ARTIFACT_DEST}"
 
           ARTIFACT_URL="${ARTIFACTORY_GENERIC}/${TARGET_REPO}/${ARTIFACT_DEST}"
-          PROPS="ci.engine=gha;ci.stage=${BUILD_STAGE};ci.repo=${{ github.repository }};ci.run=${{ github.run_number }};ci.branch=${{ github.ref_name }};ci.sha=${{ github.sha }}"
-
-          curl -f -u "${{ secrets.ARTIFACTORY_USER }}:${{ secrets.ARTIFACTORY_TOKEN }}" \
-            -H "X-Checksum-Deploy: false" \
-            -H "X-Artifactory-Prop: ${PROPS}" \
-            -T "vobs/EvolveEcom/Solr/stage/EvlSolrSlave/${RELEASE_ID}.tar" \
-            "${ARTIFACT_URL}"
-
           echo "artifact_url=${ARTIFACT_URL}" >> "$GITHUB_OUTPUT"
-          echo "Build stage: ${BUILD_STAGE} | Repo: ${TARGET_REPO}"
           echo "Published: ${ARTIFACT_URL}"
