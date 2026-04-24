@@ -136,7 +136,9 @@ jobs:
         uses: jfrog/setup-jfrog-cli@v4
         env:
           JF_URL: ${{ env.JFROG_URL }}
-          JF_ACCESS_TOKEN: ${{ secrets.ARTIFACTORY_TOKEN }}
+        with:
+          oidc-provider-name: ${{ env.JFROG_OIDC_PROVIDER }}
+          oidc-audience: ${{ env.JFROG_OIDC_AUDIENCE }}
 
       - name: Upload binary artifact to Artifactory
         id: upload
