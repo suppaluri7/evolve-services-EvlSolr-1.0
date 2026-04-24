@@ -52,13 +52,17 @@ permissions:
   id-token: write
 
 env:
-  REGISTRY: docker-evolve-bo-services-dev-local.health.artifactory.tio.systems
+  # docker-evolve-bo-services-releases-local is the confirmed-live Docker registry
+  # (same as used by evolve-services-EvolveEcom-2.0 reference workflow).
+  # POC images are pushed under poc/<owner>/ to avoid any collision with release images.
+  REGISTRY: docker-evolve-bo-services-releases-local.health.artifactory.tio.systems
   JFROG_URL: https://health.artifactory.tio.systems/
   JFROG_OIDC_PROVIDER: artifactory-evolve-bo-generic-users
   JFROG_OIDC_AUDIENCE: artifactory-evolve-bo-generic-users
   ARTIFACTORY_GENERIC: https://health.artifactory.tio.systems/artifactory
   ARTIFACTORY_BINARY_REPO: generic-evolve-services-dev-local
   APP_NAME: EvlSolrMaster
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-image:
