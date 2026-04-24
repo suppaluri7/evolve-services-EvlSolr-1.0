@@ -87,10 +87,17 @@ jobs:
           oidc-audience: ${{ env.JFROG_OIDC_AUDIENCE }}
           disable-auto-build-publish: true
 
-      - name: Log in to JFrog Docker registry
+      - name: Log in to JFrog Docker registry (push target)
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
+          username: ${{ steps.artifactory.outputs.oidc-user }}
+          password: ${{ steps.artifactory.outputs.oidc-token }}
+
+      - name: Log in to JFrog Docker registry (base image source)
+        uses: docker/login-action@v3
+        with:
+          registry: docker-eols-cijenkins-local.health.artifactory.tio.systems
           username: ${{ steps.artifactory.outputs.oidc-user }}
           password: ${{ steps.artifactory.outputs.oidc-token }}
 
