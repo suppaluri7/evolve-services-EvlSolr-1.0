@@ -139,6 +139,7 @@ jobs:
         with:
           oidc-provider-name: ${{ env.JFROG_OIDC_PROVIDER }}
           oidc-audience: ${{ env.JFROG_OIDC_AUDIENCE }}
+          disable-auto-build-publish: true
 
       - name: Upload binary artifact to Artifactory
         id: upload
